@@ -25,8 +25,10 @@ Project Organization
     │
     ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
     │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
+    ├── results            <- Generated results (figures, tables, reports)
+    │   └── figures        <- Generated graphics and figures
+    │   └── tables         <- Generated tables
+    │   └── reports        <- Generated analysis as HTML, PDF, LaTeX, etc.
     │
     ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
     │                         generated with `pip freeze > requirements.txt`
