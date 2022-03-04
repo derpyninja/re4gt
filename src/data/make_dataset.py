@@ -174,10 +174,11 @@ def occ_skills_matrix(input_folder, output_folder, config):
     return occ_skills_matrix_eo
 
 
-@click.command()
-@click.argument("input_filepath", type=click.Path(exists=True))
-@click.argument("output_filepath", type=click.Path())
-@click.argument("config_filepath", type=click.Path(exists=True))
+# TODO: need to uncomment click commands for CLI usage
+#@click.command()
+#@click.argument("input_filepath", type=click.Path(exists=True))
+#@click.argument("output_filepath", type=click.Path())
+#@click.argument("config_filepath", type=click.Path(exists=True))
 def main(input_filepath, output_filepath, config_filepath):
     """Runs data processing scripts to turn raw data from (../raw) into
     cleaned data ready to be analyzed (saved in ../processed).
@@ -202,6 +203,10 @@ if __name__ == "__main__":
 
     # find .env automagically by walking up directories until it's found, then
     # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
+    #load_dotenv(find_dotenv())
 
-    main()
+    main(
+        input_filepath=os.path.join(project_dir, "data", "raw"),
+        output_filepath=os.path.join(project_dir, "data", "interim"),
+        config_filepath=os.path.join(project_dir, "configs", "main_config.yml")
+    )

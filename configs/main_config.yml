@@ -1,3 +1,10 @@
+# EU-LFS Data
+EU_LFS:
+  FPATH_RAW: r"C:\eurostat_data\raw"
+  FPATH_RAW_YF: "C:\\eurostat_data\\raw\\Yearly_Data\\YearlyFiles_83_2019\\_YearlyFiles"
+  FPATH_INTERIM: "C:\\eurostat_data\\interim"
+  FPATH_PROCESSED: r"C:\eurostat_data\processed"
+
 # ESCO Skill Weights
 ESCO:
   LANGUAGE: "en"
