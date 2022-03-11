@@ -1,46 +1,42 @@
-# -*- coding: utf-8 -*-
+import logging
 import os
+
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-import click
-import logging
-from pathlib import Path
-from dotenv import find_dotenv, load_dotenv
-
-from src import utils
+from src import UsefulPaths
+from src.utils import load_config
 
 
-class EscoDs(object):
-    """ESCO Data Class"""
+class EscoDs(UsefulPaths):
+    """ESCO Dataset Class"""
 
-    def __init__(self, project_dir, config_fname):
+    def __init__(self, fn_config_data, fn_config_path):
         """
         TODO: description
 
         Parameters
         ----------
-        project_dir : str
-            ...
-        config_fname : str
+        fn_config_data : str
             Name of yml file with ESCO-specific configurations.
         """
-        self.project_dir = project_dir
-        self.data_raw = os.path.join(self.project_dir, "data", "raw")
-        self.data_interim = os.path.join(self.project_dir, "data", "interim")
-        self.config = utils.load_config(
-            os.path.join(self.project_dir, "configs", config_fname)
+        # inherit class storing useful paths
+        UsefulPaths.__init__(self=self, config_fname=fn_config_path)
+
+        # TODO: dynamically assign class variables based on data config file?
+        self.config_data = load_config(
+            os.path.join(self.config_dir, fn_config_data)
         )
 
-        self.onet_esco_crosswalk = pd.read_csv(
-            os.path.join(self.project_dir, self.config["CROSSWALKS"]["ONET_ESCO"])
-        )
+        self.onet_esco_crosswalk = pd.read_csv(self.path_crosswalk_onet_esco)
 
         # esco configurations
-        self.esco_language = self.config["ESCO"]["LANGUAGE"]  # "en"
-        self.esco_version = self.config["ESCO"]["VERSION"]  # "v1.0.3" or "v1.1.0"
-        self.esco_version_newest = self.config["ESCO"]["VERSION_NEWEST"]
+        self.esco_language = self.config_data["ESCO"]["LANGUAGE"]  # "en"
+        self.esco_version = self.config_data["ESCO"][
+            "VERSION"
+        ]  # "v1.0.3" or "v1.1.0"
+        self.esco_version_newest = self.config_data["ESCO"]["VERSION_NEWEST"]
         self.esco_skills_hierarchy_version = (
             "v1.0.8" if self.esco_version == "v1.0.3" else "v1.1.0"
         )
@@ -58,17 +54,19 @@ class EscoDs(object):
 
     def _read(self):
         """
-        Read main ESCO pillars (occupations, skills, occupation-skills mapping) and skills hierarchy.
+        Read main ESCO pillars (occupations, skills, occupation-skills mapping)
+        and skills hierarchy.
 
         Returns
         -------
         self.esco_data : dict
-            Dictionary containing pd.DataFrame's of the relevant ESCO pillars and metadata.
+            Dictionary containing pd.DataFrame's of the relevant ESCO pillars and
+            metadata.
         """
 
-        # -------------------------------------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------
         # core
-        # -------------------------------------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------
         occ = pd.read_csv(
             os.path.join(
                 self.data_raw,
@@ -94,9 +92,9 @@ class EscoDs(object):
             )
         )
 
-        # -------------------------------------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------
         # additional
-        # -------------------------------------------------------------------------------------------------------------
+        # -----------------------------------------------------------------------------
         # green skill labels
         green_skills = pd.read_csv(
             os.path.join(
@@ -176,8 +174,8 @@ class EscoDs(object):
         """
         # get weights of weighted form
         replace_weighted = {
-            1: self.config["ESCO"]["WEIGHT_ESSENTIAL_SKILL"],
-            2: self.config["ESCO"]["WEIGHT_OPTIONAL_SKILL"],
+            1: self.config_data["ESCO"]["WEIGHT_ESSENTIAL_SKILL"],
+            2: self.config_data["ESCO"]["WEIGHT_OPTIONAL_SKILL"],
         }
 
         # calc weighted form
@@ -187,7 +185,7 @@ class EscoDs(object):
 
         # calc unweighted form
         occ_skills_matrix_unweighted = occ_skills_matrix_eo.replace(
-            to_replace=[1, 2], value=self.config["ESCO"]["WEIGHT_UNIFORM"]
+            to_replace=[1, 2], value=self.config_data["ESCO"]["WEIGHT_UNIFORM"]
         )
 
         return {
@@ -197,9 +195,11 @@ class EscoDs(object):
 
     def occupation_skills_matrix(self):
         """
-        Calculate occupation-skills matrix (OSM) based on ESCO data. In the OSM rows denote occupations and columns skills.
-        Depending on the settings in the main configuration file, essential and optional skills are assigned different
-        weights on an occupation-to-occupation basis. An unweighted variant is always also created as a baseline.
+        Calculate occupation-skills matrix (OSM) based on ESCO data. In the OSM rows
+        denote occupations and columns skills. Depending on the settings in the main
+        configuration file, essential and optional skills are assigned different
+        weights on an occupation-to-occupation basis. An unweighted variant is
+        always also created as a baseline.
 
         Returns
         -------
@@ -212,7 +212,10 @@ class EscoDs(object):
         logger.info("Creating occupation-skills matrix.")
 
         target_path = os.path.join(
-            self.data_interim, "esco", self.esco_version, "occ_skills_matrix.pkl"
+            self.data_interim,
+            "esco",
+            self.esco_version,
+            "occ_skills_matrix.pkl",
         )
 
         if not os.path.exists(target_path):
@@ -230,7 +233,9 @@ class EscoDs(object):
 
                 # create vector
                 skill_vector = []
-                for j, skill in enumerate(self.data["skills"].conceptUri.values):
+                for j, skill in enumerate(
+                    self.data["skills"].conceptUri.values
+                ):
 
                     if skill in skill_list.skillUri.values:
                         relation_type = skill_list.loc[
@@ -275,11 +280,14 @@ class EscoDs(object):
             # read matrix from disk
             occ_skills_matrix_eo = pd.read_pickle(target_path)
 
-        return self._calc_osm_variants(occ_skills_matrix_eo=occ_skills_matrix_eo)
+        return self._calc_osm_variants(
+            occ_skills_matrix_eo=occ_skills_matrix_eo
+        )
 
     def occupation_similarity_matrix(self):
         """
-        Calculate weighted and unweighted forms of the co-occurrence occupation similarity matrix (OSIM).
+        Calculate weighted and unweighted forms of the co-occurrence occupation
+        similarity matrix (OSIM).
 
         Returns
         -------
@@ -300,7 +308,8 @@ class EscoDs(object):
             "occ_sim_matrix_{}_coo.pkl",
         )
 
-        # calculate co-occurrence matrices for both variants (via matrix multiplication with transpose form)
+        # calculate co-occurrence matrices for both variants
+        # (via matrix multiplication with transpose form)
         osim_dict = {}
         for osm_version, osm_data in osm_dict.items():
             variant = osm_version.split("_")[1]
@@ -309,7 +318,9 @@ class EscoDs(object):
             if variant == "unweighted":
                 continue
 
-            logger.info("Calculating {} occupation similarity matrix.".format(variant))
+            logger.info(
+                "Calculating {} occupation similarity matrix.".format(variant)
+            )
             target_path = target_path_template.format(variant)
 
             if not os.path.exists(target_path):
@@ -328,25 +339,31 @@ class EscoDs(object):
                 df_occ_sim_matrix_weighted_coo.to_pickle(target_path)
 
             else:
-                osim_dict["osim_{}".format(variant)] = pd.read_pickle(target_path)
+                osim_dict["osim_{}".format(variant)] = pd.read_pickle(
+                    target_path
+                )
 
         return osim_dict
 
     def skills_metadata(self):
         """
-        Calculate and merge relevant metadata to the ESCO skills pillar (greenness, coreness).
+        Calculate and merge relevant metadata to the ESCO skills pillar (greenness,
+        coreness).
 
         Evaluation
             - ESCO v.1.1.0 comprises 13891 skills compared to v.1.0.3 with 13485 skills.
             - Hence, overall 406 new skills in v.1.1.0 compared to v.1.0.3.
-            - 570 skills labelled as green in v.1.1.0, some of which are presumably new, while other's already existed.
+            - 570 skills labelled as green in v.1.1.0, some of which are presumably new,
+            while other's already existed.
             - After merging we don't obtain coreness values for 512 skills in v.1.1.0.
-            - This means that the conceptUri of 512 - 406 = 106 skills that existed in the last version must have changed.
+            - This means that the conceptUri of 512 - 406 = 106 skills that existed in
+            the last version must have changed.
 
         Returns
         -------
         skills_metadata : pd.DataFrame
-            DataFrame containing the raw ESCO skills pillar data enriched by additional metadata (green labels, coreness).
+            DataFrame containing the raw ESCO skills pillar data enriched by additional
+            metadata (green labels, coreness).
         """
         logger = logging.getLogger(__name__)
         logger.info(
@@ -362,11 +379,12 @@ class EscoDs(object):
         )
 
         if not os.path.exists(target_path):
-            # ---------------------------------------------------------------------------------------------------------
+            # -------------------------------------------------------------------------
             # Green Skills
-            # ---------------------------------------------------------------------------------------------------------
-            # Find cols that are unique in green skills file compared to general skills file
-            # "The difference between A and B contains all elements that are in A but not in B."
+            # -------------------------------------------------------------------------
+            # Find cols that are unique in green skills file compared to general
+            # skills file: "The difference between A and B contains all elements that
+            # are in A but not in B."
             # Source: https://www.kaggle.com/ashukr/sets-and-venn-diagram-in-python
             set_diff = list(
                 set(self.data["skills_green"].columns.values.tolist())
@@ -386,16 +404,18 @@ class EscoDs(object):
                 value={self.green_id_colname: False}
             )
 
-            # ---------------------------------------------------------------------------------------------------------
+            # -------------------------------------------------------------------------
             # Coreness Metric
-            # ---------------------------------------------------------------------------------------------------------
+            # -------------------------------------------------------------------------
             # append conceptUri of ESCO v1.0.3 skills
             skills_v103 = pd.read_csv(
                 os.path.join(
                     self.data_raw,
                     "esco",
                     "v1.0.3",
-                    "skills_{}.csv".format(self.config["ESCO"]["LANGUAGE"]),
+                    "skills_{}.csv".format(
+                        self.config_data["ESCO"]["LANGUAGE"]
+                    ),
                 )
             )
             keep_cols = ["conceptUri", "preferredLabel"]
@@ -416,7 +436,8 @@ class EscoDs(object):
                 validate="one_to_one",
             )
 
-            # note: this dataset refers to variable "greenskill" in the FDZ Verfahrensbeschreibung
+            # note: this dataset refers to variable "greenskill"
+            #  in the FDZ Verfahrensbeschreibung
             # save
             self.data["skills_metadata"] = skills_metadata
             skills_metadata.to_csv(target_path)
@@ -431,7 +452,9 @@ class EscoDs(object):
         occ_skills_matrix_unweighted = osm["osm_unweighted"]
 
         # number of occupation-specific skills
-        n_total_specific_skills = occ_skills_matrix_unweighted.sum(axis=1).values
+        n_total_specific_skills = occ_skills_matrix_unweighted.sum(
+            axis=1
+        ).values
 
         # number of occupation-specific green skills
         green_specific_skills = (
@@ -459,7 +482,10 @@ class EscoDs(object):
     def read_greenness_task_based(self):
         greenness_onet_gtp = pd.read_excel(
             io=os.path.join(
-                self.data_raw, "onet", "green_task_project", "Onet_GreenTask_AppA.xlsx"
+                self.data_raw,
+                "onet",
+                "green_task_project",
+                "Onet_GreenTask_AppA.xlsx",
             ),
             sheet_name="Occupations",
         )
@@ -484,12 +510,17 @@ class EscoDs(object):
         # merge to ESCO occupations pillar via crosswalk
         greenness_onet_esco = greenness_onet.copy()
         greenness_onet_esco = greenness_onet_esco.merge(
-            right=self.onet_esco_crosswalk, on="onet_code", how="left", validate="1:m"
+            right=self.onet_esco_crosswalk,
+            on="onet_code",
+            how="left",
+            validate="1:m",
         )
 
         # save
         greenness_onet.to_csv(
-            os.path.join(self.data_interim, "onet", "task_based_greenness_onet.csv")
+            os.path.join(
+                self.data_interim, "onet", "task_based_greenness_onet.csv"
+            )
         )
 
         greenness_onet_esco.to_csv(
@@ -550,57 +581,3 @@ class EscoDs(object):
             occ_metadata = pd.read_csv(target_fpath)
 
         return occ_metadata
-
-
-# note: need to uncomment click commands for CLI usage
-# @click.command()
-# @click.argument("input_filepath", type=click.Path(exists=True))
-# @click.argument("output_filepath", type=click.Path())
-# @click.argument("config_filepath", type=click.Path(exists=True))
-def main(project_directory, config_fname):
-    """
-    Runs data processing scripts to turn raw data from (../raw) into
-    cleaned data ready to be analyzed (saved in ../processed).
-
-    Parameters
-    ----------
-    project_directory : str
-        Path where project dir is located.
-    config_fname : str
-        Name of yml file containing pre-processing configurations.
-
-    Returns
-    -------
-    None
-    """
-    logger = logging.getLogger(__name__)
-    logger.info("Making interim data sets from raw data.")
-
-    # initialise ESCO data container
-    esco = EscoDs(
-        project_dir=project_directory,
-        config_fname=config_fname,
-    )
-
-    # run pre-processing chain
-    esco.occupation_skills_matrix()
-    esco.occupation_similarity_matrix()
-    esco.skills_metadata()
-    esco.occupation_metadata()
-
-
-if __name__ == "__main__":
-    log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
-
-    # not used in this stub but often useful for finding various files
-    project_directory = str(Path(__file__).resolve().parents[2])
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    # load_dotenv(find_dotenv())
-
-    main(
-        project_directory=project_directory,
-        config_fname="main_config.yml",
-    )

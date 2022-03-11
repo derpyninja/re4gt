@@ -1,24 +1,26 @@
-PATHS_MAIN:
-  DATA_RAW: ""
-  DATA_INTERIM: ""
-  DATA_PROCESSED: ""
-  DATA_EXTERNAL: ""
-  CONFIGS: ""
-  RESULTS_FIGURES: ""
-  RESULTS_TABLES: ""
-  RESULTS_REPORTS: ""
+# metadata giving hints on how the config file should be parsed
+metadata:
+  path_keys: ["eulfs", "crosswalk"]
 
-CROSSWALKS:
-  ONET_ESCO: "data\\raw\\mapping-career-causeways\\codebase\\data\\processed\\ESCO_ONET_xwalk_full.csv"
+# -------------------------------------------------------------------------------------
+# PATHS
+# -------------------------------------------------------------------------------------
+# EU-LFS Data
+eulfs:
+  raw: "C:\\eurostat_data\\raw"
+  raw_yf: "C:\\eurostat_data\\raw\\Yearly_Data\\YearlyFiles_83_2019\\_YearlyFiles"
+  interim: "C:\\eurostat_data\\interim"
+  processed: "C:\\eurostat_data\\processed"
 
-# EU-LFS Data PATHS_EULFS
-EU_LFS:
-  FPATH_RAW: "C:\\eurostat_data\\raw"
-  FPATH_RAW_YF: "C:\\eurostat_data\\raw\\Yearly_Data\\YearlyFiles_83_2019\\_YearlyFiles"
-  FPATH_INTERIM: "C:\\eurostat_data\\interim"
-  FPATH_PROCESSED: "C:\\eurostat_data\\processed"
+# Note: relative paths need to start one level below the project directory
+#   to be parsed correctly
+crosswalk:
+  onet_esco: "data\\raw\\mapping-career-causeways\\codebase\\data\\processed
+  \\ESCO_ONET_xwalk_full.csv"
 
-# ESCO Skill Weights
+# -------------------------------------------------------------------------------------
+# ESCO
+# -------------------------------------------------------------------------------------
 ESCO:
   LANGUAGE: "en"
   VERSION: "v1.0.3"
@@ -27,7 +29,9 @@ ESCO:
   WEIGHT_ESSENTIAL_SKILL: 1
   WEIGHT_OPTIONAL_SKILL: 0.5
 
+# -------------------------------------------------------------------------------------
 # Transition Analysis Parameters
+# -------------------------------------------------------------------------------------
 TRANSITION_ANALYSIS:
   MIN_VIABLE: 0.3
   HIGHLY_VIABLE: 0.4
