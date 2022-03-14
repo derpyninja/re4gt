@@ -1,6 +1,6 @@
 # EU-LFS Data
 metadata:
-  relative_paths: ["path_crosswalk"]
+  relative_paths: ["path_crosswalk", "path_geodata", "path_clsf"]
   absolute_paths: ["path_eulfs"]
 
 path_eulfs:
@@ -12,3 +12,10 @@ path_eulfs:
 # Note: relative paths need to start one level below the project directory to be parsed correctly
 path_crosswalk:
   onet_esco: "data\\raw\\mapping-career-causeways\\codebase\\data\\processed\\ESCO_ONET_xwalk_full.csv"
+
+path_geodata:
+  nuts_2d: "data\\external\\geodata\\NUTS_RG_03M_2021_4326_LEVL_2\\NUTS_RG_03M_2021_4326_LEVL_2.shp"
+
+path_clsf:
+  nace_1d: "data\\external\\classifications\\nace\\nace_rev2_1d_section_codes.csv"
+  isco08: "data\\raw\\esco\\{}\\ISCOGroups_en.csv"

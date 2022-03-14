@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
-from src.data.esco import EscoDs
+from src.data.datasets import EscoDs, EulfsDs
 
 
 # note: need to uncomment click commands for CLI usage
@@ -26,19 +26,24 @@ def main(config_paths, config_data):
     logger = logging.getLogger(__name__)
     logger.info("Making interim data sets from raw data.")
 
-    # ESCO
+    # run pre-processing chain: ESCO
     esco = EscoDs(
         fn_config_path=config_paths,
         fn_config_data=config_data,
     )
 
-    # run pre-processing chain
-    esco.occupation_skills_matrix()
-    esco.occupation_similarity_matrix()
-    esco.skills_metadata()
-    esco.occupation_metadata()
+    # esco.occupation_skills_matrix()
+    # esco.occupation_similarity_matrix()
+    # esco.skills_metadata()
+    # esco.occupation_metadata()
 
-    # TODO: refactor EU-LFS preprocessing pipe from eulfs.py here
+    # # run pre-processing chain: EU-LFS
+    eulfs = EulfsDs(
+        fn_config_path=config_paths,
+        fn_config_data=config_data,
+    )
+
+    eulfs.preprocess()
 
 
 if __name__ == "__main__":

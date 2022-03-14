@@ -3,7 +3,7 @@
 # -------------------------------------------------------------------------------------
 ESCO:
   LANGUAGE: "en"
-  VERSION: "v1.0.3"
+  VERSION: "v1.1.0"
   VERSION_NEWEST: "v1.1.0"
   WEIGHT_UNIFORM: 1
   WEIGHT_ESSENTIAL_SKILL: 1

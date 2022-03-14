@@ -27,9 +27,7 @@ class UsefulPaths:
         self.data_dir = os.path.join(self.project_dir, "data")
         self.data_raw = os.path.join(self.project_dir, "data", "raw")
         self.data_interim = os.path.join(self.project_dir, "data", "interim")
-        self.data_processed = os.path.join(
-            self.project_dir, "data", "processed"
-        )
+        self.data_processed = os.path.join(self.project_dir, "data", "processed")
         self.data_external = os.path.join(self.project_dir, "data", "external")
         self.notebook_dir = os.path.join(self.project_dir, "notebooks")
         self.figure_dir = os.path.join(self.project_dir, "results", "figures")
@@ -56,6 +54,7 @@ class UsefulPaths:
                     else:
                         v_new = v2
                     # instantiate class attributes
+                    # TODO: check if that really makes sense. don't think so.
                     setattr(self, k_new, v_new)
 
 

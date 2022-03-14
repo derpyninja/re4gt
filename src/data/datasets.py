@@ -3,9 +3,10 @@ import os
 
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 from tqdm import tqdm
 
-from src import UsefulPaths
+from src import UsefulPaths, utils
 from src.utils import load_config
 
 
@@ -25,17 +26,13 @@ class EscoDs(UsefulPaths):
         UsefulPaths.__init__(self=self, config_fname=fn_config_path)
 
         # TODO: dynamically assign class variables based on data config file?
-        self.config_data = load_config(
-            os.path.join(self.config_dir, fn_config_data)
-        )
+        self.config_data = load_config(os.path.join(self.config_dir, fn_config_data))
 
         self.onet_esco_crosswalk = pd.read_csv(self.path_crosswalk_onet_esco)
 
         # esco configurations
         self.esco_language = self.config_data["ESCO"]["LANGUAGE"]  # "en"
-        self.esco_version = self.config_data["ESCO"][
-            "VERSION"
-        ]  # "v1.0.3" or "v1.1.0"
+        self.esco_version = self.config_data["ESCO"]["VERSION"]  # "v1.0.3" or "v1.1.0"
         self.esco_version_newest = self.config_data["ESCO"]["VERSION_NEWEST"]
         self.esco_skills_hierarchy_version = (
             "v1.0.8" if self.esco_version == "v1.0.3" else "v1.1.0"
@@ -233,9 +230,7 @@ class EscoDs(UsefulPaths):
 
                 # create vector
                 skill_vector = []
-                for j, skill in enumerate(
-                    self.data["skills"].conceptUri.values
-                ):
+                for j, skill in enumerate(self.data["skills"].conceptUri.values):
 
                     if skill in skill_list.skillUri.values:
                         relation_type = skill_list.loc[
@@ -280,9 +275,7 @@ class EscoDs(UsefulPaths):
             # read matrix from disk
             occ_skills_matrix_eo = pd.read_pickle(target_path)
 
-        return self._calc_osm_variants(
-            occ_skills_matrix_eo=occ_skills_matrix_eo
-        )
+        return self._calc_osm_variants(occ_skills_matrix_eo=occ_skills_matrix_eo)
 
     def occupation_similarity_matrix(self):
         """
@@ -318,9 +311,7 @@ class EscoDs(UsefulPaths):
             if variant == "unweighted":
                 continue
 
-            logger.info(
-                "Calculating {} occupation similarity matrix.".format(variant)
-            )
+            logger.info("Calculating {} occupation similarity matrix.".format(variant))
             target_path = target_path_template.format(variant)
 
             if not os.path.exists(target_path):
@@ -339,9 +330,7 @@ class EscoDs(UsefulPaths):
                 df_occ_sim_matrix_weighted_coo.to_pickle(target_path)
 
             else:
-                osim_dict["osim_{}".format(variant)] = pd.read_pickle(
-                    target_path
-                )
+                osim_dict["osim_{}".format(variant)] = pd.read_pickle(target_path)
 
         return osim_dict
 
@@ -413,9 +402,7 @@ class EscoDs(UsefulPaths):
                     self.data_raw,
                     "esco",
                     "v1.0.3",
-                    "skills_{}.csv".format(
-                        self.config_data["ESCO"]["LANGUAGE"]
-                    ),
+                    "skills_{}.csv".format(self.config_data["ESCO"]["LANGUAGE"]),
                 )
             )
             keep_cols = ["conceptUri", "preferredLabel"]
@@ -452,9 +439,7 @@ class EscoDs(UsefulPaths):
         occ_skills_matrix_unweighted = osm["osm_unweighted"]
 
         # number of occupation-specific skills
-        n_total_specific_skills = occ_skills_matrix_unweighted.sum(
-            axis=1
-        ).values
+        n_total_specific_skills = occ_skills_matrix_unweighted.sum(axis=1).values
 
         # number of occupation-specific green skills
         green_specific_skills = (
@@ -518,9 +503,7 @@ class EscoDs(UsefulPaths):
 
         # save
         greenness_onet.to_csv(
-            os.path.join(
-                self.data_interim, "onet", "task_based_greenness_onet.csv"
-            )
+            os.path.join(self.data_interim, "onet", "task_based_greenness_onet.csv")
         )
 
         greenness_onet_esco.to_csv(
@@ -581,3 +564,145 @@ class EscoDs(UsefulPaths):
             occ_metadata = pd.read_csv(target_fpath)
 
         return occ_metadata
+
+
+class LmData(UsefulPaths):
+    def __init__(self, fn_config_data, fn_config_path):
+        # inherit path structure
+        UsefulPaths.__init__(self=self, config_fname=fn_config_path)
+
+        # read data configs
+        self.config_data = utils.load_config(
+            os.path.join(self.config_dir, fn_config_data)
+        )
+
+        # read relevant data across 3 dimensions: industry, occupation, region
+        self.gdf_nuts_2d = gpd.read_file(self.path_geodata_nuts_2d)
+        self.df_nace_1d = pd.read_csv(self.path_clsf_nace_1d, delimiter=";")
+        self.path_clsf_isco08 = self.path_clsf_isco08.format(
+            self.config_data["ESCO"]["VERSION_NEWEST"]
+        )
+
+        # read
+        self.df_isco08_3d = self._read_isco_3d()
+
+    def _read_isco_3d(self):
+        fpath = self.path_clsf_isco08.format(self.config_data["ESCO"]["VERSION_NEWEST"])
+        df_isco = pd.read_csv(
+            fpath,
+            usecols=["code", "preferredLabel"],
+        )
+        df_isco = df_isco.loc[df_isco.code.astype(str).str.len() < 4].reset_index(
+            drop=True
+        )
+        df_isco.code = df_isco.code.astype(str)
+        df_isco.code = df_isco.code.str.pad(width=3, side="left", fillchar="0")
+        df_isco = df_isco.rename(columns={"preferredLabel": "ISCO3D_label"})
+        return df_isco
+
+
+class EulfsDs(UsefulPaths):
+    """EU LFS Dataset Class"""
+
+    def __init__(self, fn_config_data, fn_config_path):
+        # inherit path structure
+        UsefulPaths.__init__(self=self, config_fname=fn_config_path)
+
+        # static params
+        self.fmt_folder = "{}_YEAR_1998_onwards"
+        self.fmt_file = "{}{}_y.csv"
+        self.fmt_file_out = "eu_lfs_merged_{}.csv"
+
+        # read data configs
+        self.config_data = utils.load_config(
+            os.path.join(self.config_dir, fn_config_data)
+        )
+
+        # assign vars
+        # TODO: implement multiple years
+        self.years = self.config_data["lfs_eu"]["years"]
+        self.countries = self.config_data["lfs_eu"]["countries"]
+        self.variables = self.config_data["lfs_eu"]["variables"]
+        self.na_values = self.config_data["lfs_eu"]["na_values"]
+        self.dtypes = self.config_data["lfs_eu"]["dtypes"]
+
+    def preprocess(self):
+        """"""
+        list_of_dfs = []
+
+        for year in self.years:
+            for country in self.countries:
+
+                # define fpath
+                folder = self.fmt_folder.format(country)
+                file = self.fmt_file.format(country, year)
+                fpath_full = os.path.join(self.path_eulfs_raw_yf, folder, file)
+
+                # read raw data
+                df = pd.read_csv(
+                    fpath_full,
+                    usecols=self.variables,
+                    na_values=self.na_values,
+                    dtype=self.dtypes,
+                    converters={
+                        "COEFF": lambda x: float(x) * 1000 if x != "" else np.nan
+                    },
+                )
+
+                # filter based on conditions
+                cond_is_working = df.WSTATOR.isin(["1", "2"])  # beschäftigt
+                cond_private_household = df.HHTYPE.isin(["1"])  # privater wohnraum
+                cond_has_isco_code = df.ISCO3D.notna()
+                cond_not_inactive = df.ILOSTAT.isin(["1", "2"])  # inaktiv
+                cond_in_country = df.COUNTRYW.isin([country])  # pendler
+                cond_valid_region = df.REGIONW != "00"
+                cond_age = df.AGE <= 77  # (77 is the center of the 75-79 age band)
+                cond_military = ~df.ISCO3D.isin(["011"])  # military
+
+                df_sub = df.loc[
+                    cond_is_working
+                    & cond_private_household
+                    & cond_not_inactive
+                    & cond_in_country
+                    & cond_valid_region
+                    & cond_has_isco_code
+                    & cond_military
+                    & cond_age
+                ]
+
+                # remove categories that remain unused after filtering
+                # TODO: fix SettingWithCopyWarning
+                for col in df_sub.columns:
+                    if pd.api.types.is_categorical_dtype(df_sub[col]):
+                        df_sub.loc[:, col] = df_sub.loc[
+                            :, col
+                        ].cat.remove_unused_categories()
+
+                # set NUTS code
+                df_sub.loc[:, "NUTS_ID"] = df_sub.loc[:, "COUNTRYW"].astype(
+                    str
+                ) + df_sub.loc[:, "REGIONW"].astype(str)
+
+                # append clean df
+                list_of_dfs.append(df_sub)
+
+        # Combine country-level data
+        df_merged = pd.concat(list_of_dfs, axis=0).reset_index(drop=True)
+        df_merged = df_merged.astype(self.dtypes)
+
+        # Save to disk
+        # TODO: fix sluggish code regarding year formatting
+        df_merged.to_csv(
+            os.path.join(self.path_eulfs_interim, self.fmt_file_out.format(year))
+        )
+
+
+if __name__ == "__main__":
+    config_paths = "paths_config.yml"
+    config_data = "data_config.yml"
+
+    lm_data = LmData(fn_config_path=config_paths, fn_config_data=config_data)
+
+    class_vars = vars(lm_data)
+    for key, val in class_vars.items():
+        print(key, val)
