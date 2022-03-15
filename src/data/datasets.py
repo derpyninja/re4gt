@@ -28,7 +28,8 @@ class EscoDs(UsefulPaths):
         # TODO: dynamically assign class variables based on data config file?
         self.config_data = load_config(os.path.join(self.config_dir, fn_config_data))
 
-        self.onet_esco_crosswalk = pd.read_csv(self.path_crosswalk_onet_esco)
+        # crosswalk to onet
+        self.onet_esco_crosswalk = self._read_crosswalk_to_onet()
 
         # esco configurations
         self.esco_language = self.config_data["ESCO"]["LANGUAGE"]  # "en"
@@ -48,6 +49,16 @@ class EscoDs(UsefulPaths):
 
         # read data
         self.data = self._read()
+
+    def _read_crosswalk_to_onet(self):
+        crosswalk = pd.read_csv(self.path_crosswalk_onet_esco)
+
+        # decompose isco 4-digit level
+        for lvl in [1, 2, 3]:
+            crosswalk["isco_level_{}".format(lvl)] = (
+                crosswalk["isco_level_4"].astype(str).str[:1].astype(int)
+            )
+        return crosswalk
 
     def _read(self):
         """
@@ -90,9 +101,9 @@ class EscoDs(UsefulPaths):
         )
 
         # -----------------------------------------------------------------------------
-        # additional
+        # additional (ESCO)
         # -----------------------------------------------------------------------------
-        # green skill labels
+        # ESCO green skill labels
         green_skills = pd.read_csv(
             os.path.join(
                 self.data_raw,
@@ -103,28 +114,6 @@ class EscoDs(UsefulPaths):
         )
         green_skills[self.green_id_colname] = True
 
-        # coreness values
-        skills_coreness = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "mapping-career-causeways",
-                "codebase",
-                "data",
-                "interim",
-                "upskilling_analysis",
-                "skills_coreness_measure.csv",
-            )
-        )
-
-        # skill groups
-        skill_groups = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_version,
-                "skillGroups_{}.csv".format(self.esco_language),
-            )
-        )
         skills_hierarchy = pd.read_csv(
             os.path.join(
                 self.data_raw,
@@ -146,6 +135,57 @@ class EscoDs(UsefulPaths):
             )
         )
 
+        # skill groups
+        skill_groups = pd.read_csv(
+            os.path.join(
+                self.data_raw,
+                "esco",
+                self.esco_version,
+                "skillGroups_{}.csv".format(self.esco_language),
+            )
+        )
+
+        # -----------------------------------------------------------------------------
+        # additional (Nesta)
+        # -----------------------------------------------------------------------------
+
+        # coreness values
+        skills_coreness = pd.read_csv(
+            os.path.join(
+                self.data_raw,
+                "mapping-career-causeways",
+                "codebase",
+                "data",
+                "interim",
+                "upskilling_analysis",
+                "skills_coreness_measure.csv",
+            )
+        )
+
+        job_zones_onet = pd.read_csv(
+            os.path.join(
+                self.data_raw,
+                "mapping-career-causeways",
+                "codebase",
+                "data",
+                "processed",
+                "linked_data",
+                "ESCO_occupations_Job_Zones.csv",
+            )
+        )
+
+        covid_exposure = pd.read_csv(
+            os.path.join(
+                self.data_raw,
+                "mapping-career-causeways",
+                "codebase",
+                "data",
+                "processed",
+                "linked_data",
+                "ESCO_occupations_COVID_Exposure.csv",
+            )
+        )
+
         return {
             "occ": occ,
             "skills": skills,
@@ -155,6 +195,8 @@ class EscoDs(UsefulPaths):
             "skills_hierarchy": skills_hierarchy,
             "skills_hierarchy_kanders": skills_hierarchy_kanders,
             "skill_groups": skill_groups,
+            "job_zones_onet": job_zones_onet,
+            "covid_exposure": covid_exposure,
         }
 
     def _calc_osm_variants(self, occ_skills_matrix_eo):
@@ -518,6 +560,48 @@ class EscoDs(UsefulPaths):
 
         return greenness_onet_esco
 
+    # TODO: implement
+    def _read_brown_occupations_vona2018(self):
+        brown_occs_vona2018 = pd.read_csv(
+            os.path.join(
+                self.data_raw, "onet", "vona_2018", "brown_occupations_vona2018.csv"
+            )
+        )
+
+        # pad to 8 digits
+        brown_occs_vona2018["soc_code"] = brown_occs_vona2018["soc_code"] + ".00"
+
+        # add brown occupation classification
+        brown_occs_vona2018["is_brown"] = np.ones(
+            brown_occs_vona2018.shape[0], dtype=bool
+        )
+
+        # merge to ESCO occupations pillar via crosswalk
+        brown_occs_vona2018_esco = brown_occs_vona2018.merge(
+            right=self.onet_esco_crosswalk,
+            left_on="soc_code",
+            right_on="onet_code",
+            how="left",
+            # validate="1:1",
+        )
+
+        # save
+        brown_occs_vona2018_esco.to_csv(
+            os.path.join(
+                self.data_interim,
+                "onet",
+                "brown_occupations_vona2018_esco_{}.csv".format(
+                    self.esco_version.replace(".", "")
+                ),
+            )
+        )
+
+        return brown_occs_vona2018_esco
+
+    # TODO: implement
+    def classify_occupations_gbn(self):
+        pass
+
     def occupation_metadata(self):
         """
 
@@ -533,21 +617,32 @@ class EscoDs(UsefulPaths):
         )
 
         if not os.path.exists(target_fpath):
+            # init container
+            occ_metadata = self.data["occ"].copy()
+
             # ESCO-based Greenness (skill-based, supply side)
             df_greenness_esco = self.calc_greenness_skill_based()
 
             # ONET-based Greenness (task-based, demand side)
             df_greenness_onet_esco = self.read_greenness_task_based()
 
-            # merge ESCO and O*NET greenness scores to occupation df
-            occ_metadata = self.data["occ"].copy()
+            # ONET-based brown occupations
+            df_brown_occs_vona2018_esco = self._read_brown_occupations_vona2018()
+
+            # ONET-based G/B/N classification
+            # TODO: implement
+
+            # TODO: join --> ONET job zone, COVID Exposure,
+
+            # merge variables to occupation df
 
             # ESCO-based
             occ_metadata = occ_metadata.merge(
                 right=df_greenness_esco,
                 on="conceptUri",
                 how="left",
-                validate="one_to_one",
+                suffixes=["", "_y"],
+                validate="1:1",
             )
 
             # O*NET-based
@@ -556,9 +651,55 @@ class EscoDs(UsefulPaths):
                 left_on="conceptUri",
                 right_on="concept_uri",
                 how="left",
+                suffixes=["", "_y"],
                 validate="1:m",
             )
 
+            occ_metadata = occ_metadata.merge(
+                right=df_brown_occs_vona2018_esco,
+                left_on="conceptUri",
+                right_on="concept_uri",
+                how="left",
+                suffixes=["", "_y"],
+                validate="1:m",
+            )
+
+            # TODO: refactor to function
+            # classify green  & neutral occupations (data from GTP covers more
+            # occupations, therefore using those. correlation with Vona 2018
+            # greenness scores ~ 1)
+            occ_metadata["is_green"] = occ_metadata.greenness_gtp > 0
+            occ_metadata["is_brown"] = occ_metadata["is_brown"].fillna(False)
+            occ_metadata["is_neutral"] = (occ_metadata.is_green == False) & (
+                occ_metadata.is_brown == False
+            )
+
+            # 8ung: there are 30 occupations that have been matched to both brown and green
+            # the neutral occupations are fine! have to make decision on where to map the
+            # ambiguous cases
+            query_ambiguous_cases = (occ_metadata.is_brown == True) & (
+                occ_metadata.is_green == True
+            )
+
+            # define ambiguous cases as brown (see thesis)
+            occ_metadata.loc[query_ambiguous_cases, "is_green"] = False
+            # occ_metadata = occ_metadata.reset_index(drop=True)
+
+            # create single classification column
+            # TODO: check if only one True per col
+            occ_metadata["classification_gbn"] = occ_metadata[
+                ["is_brown", "is_green", "is_neutral"]
+            ].idxmax(axis=1)
+
+            # filter out duplicate columns
+            occ_metadata = occ_metadata.drop(
+                occ_metadata.filter(regex="_y$").columns.tolist(), axis=1
+            )
+
+            # check if all occs are classified
+            assert occ_metadata["classification_gbn"].isna().sum() == 0
+
+            # note: comment line below for testing
             occ_metadata.to_csv(target_fpath)
         else:
             occ_metadata = pd.read_csv(target_fpath)
@@ -567,7 +708,18 @@ class EscoDs(UsefulPaths):
 
 
 class LmData(UsefulPaths):
-    def __init__(self, fn_config_data, fn_config_path):
+    def __init__(self, fn_config_path, fn_config_data):
+        """
+        Basic class for storing Labour Market Data Classifications across 3 dimensions:
+        occupations, industries and regions.
+
+        Parameters
+        ----------
+        fn_config_path : str
+            Name of config file storing relevant static parameters.
+        fn_config_data : str
+            Name of configuration file storing relevant paths.
+        """
         # inherit path structure
         UsefulPaths.__init__(self=self, config_fname=fn_config_path)
 
@@ -576,37 +728,73 @@ class LmData(UsefulPaths):
             os.path.join(self.config_dir, fn_config_data)
         )
 
-        # read relevant data across 3 dimensions: industry, occupation, region
-        self.gdf_nuts_2d = gpd.read_file(self.path_geodata_nuts_2d)
-        self.df_nace_1d = pd.read_csv(self.path_clsf_nace_1d, delimiter=";")
+        # unpack data config
+        self.n_digits_isco08 = self.config_data["lfs_eu"]["n_digits_isco08"]
+
+        # parametrise data paths
+        # TODO: make reading industry & geo-data flexible with respect to the desired
+        #   granularity. Similar to ISCO data approach below.
         self.path_clsf_isco08 = self.path_clsf_isco08.format(
             self.config_data["ESCO"]["VERSION_NEWEST"]
         )
+        self.path_clsf_nace = self.path_clsf_nace_1d
+        self.path_geodata_nuts = self.path_geodata_nuts_2d
 
-        # read
-        self.df_isco08_3d = self._read_isco_3d()
+        # read relevant data across 3 dimensions: industry, occupation, region
+        self.df_isco08 = self._read_isco08()
+        self.df_nace = self._read_nace()
+        self.gdf_nuts = self._read_nuts()
 
-    def _read_isco_3d(self):
+    # TODO (low priority): implement reading 1D ISCO classification
+    def _read_isco08(self):
+        """
+        Read ISCO-08 occupation data. Granularity depends on the data configuration
+        file parameter "n_digits_isco08".
+
+        Returns
+        -------
+        df_isco : pd.DataFrame
+            Mapping of ISCO-08 codes and labels at the desired granularity.
+        """
+        # read original data from ESCO
         fpath = self.path_clsf_isco08.format(self.config_data["ESCO"]["VERSION_NEWEST"])
         df_isco = pd.read_csv(
             fpath,
             usecols=["code", "preferredLabel"],
         )
-        df_isco = df_isco.loc[df_isco.code.astype(str).str.len() < 4].reset_index(
-            drop=True
-        )
+
+        # subset depending on desired granularity
+        df_isco = df_isco.loc[
+            df_isco.code.astype(str).str.len() < self.n_digits_isco08
+        ].reset_index(drop=True)
+
+        # format and pad
         df_isco.code = df_isco.code.astype(str)
-        df_isco.code = df_isco.code.str.pad(width=3, side="left", fillchar="0")
-        df_isco = df_isco.rename(columns={"preferredLabel": "ISCO3D_label"})
+        df_isco.code = df_isco.code.str.pad(
+            width=self.n_digits_isco08, side="left", fillchar="0"
+        )
+
+        # rename
+        df_isco = df_isco.rename(
+            columns={"code": "isco_level_{}".format(self.n_digits_isco08)}
+        )
         return df_isco
 
+    def _read_nace(self):
+        return pd.read_csv(self.path_clsf_nace, delimiter=";")
 
-class EulfsDs(UsefulPaths):
+    def _read_nuts(self):
+        return gpd.read_file(self.path_geodata_nuts)
+
+
+class EulfsDs(LmData):
     """EU LFS Dataset Class"""
 
     def __init__(self, fn_config_data, fn_config_path):
-        # inherit path structure
-        UsefulPaths.__init__(self=self, config_fname=fn_config_path)
+        # inherit LmData
+        LmData.__init__(
+            self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
+        )
 
         # static params
         self.fmt_folder = "{}_YEAR_1998_onwards"
@@ -703,6 +891,9 @@ if __name__ == "__main__":
 
     lm_data = LmData(fn_config_path=config_paths, fn_config_data=config_data)
 
-    class_vars = vars(lm_data)
-    for key, val in class_vars.items():
-        print(key, val)
+    df = lm_data.gdf_nuts
+    print(df)
+
+    # class_vars = vars(lm_data)
+    # for key, val in class_vars.items():
+    #     print(key, val)

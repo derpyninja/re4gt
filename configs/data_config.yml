@@ -11,8 +11,13 @@ ESCO:
 
 # -------------------------------------------------------------------------------------
 # EU-LFS
+#   n_digits_isco08: int
+#     Number of digits in ISCO-08 occupation classification. Needs to be in [2, 4].
 # -------------------------------------------------------------------------------------
 lfs_eu:
+  n_digits_isco08: 3
+  n_digits_nace: 1
+  n_digits_nuts: 2
   years: ["2019"]
   countries: [
     "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR",

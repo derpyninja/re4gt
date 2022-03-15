@@ -34,16 +34,16 @@ def main(config_paths, config_data):
 
     # esco.occupation_skills_matrix()
     # esco.occupation_similarity_matrix()
-    # esco.skills_metadata()
-    # esco.occupation_metadata()
+    esco.skills_metadata()
+    esco.occupation_metadata()
 
-    # # run pre-processing chain: EU-LFS
-    eulfs = EulfsDs(
-        fn_config_path=config_paths,
-        fn_config_data=config_data,
-    )
-
-    eulfs.preprocess()
+    # run pre-processing chain: EU-LFS
+    # eulfs = EulfsDs(
+    #     fn_config_path=config_paths,
+    #     fn_config_data=config_data,
+    # )
+    #
+    # eulfs.preprocess()
 
 
 if __name__ == "__main__":
