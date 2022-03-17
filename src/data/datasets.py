@@ -40,7 +40,16 @@ class EscoDs(UsefulPaths):
         )
 
         # static params
-        self.green_id_colname = "skillGreen"
+        self.skill_types_gbn = ["green", "brown", "neutral"]
+        self.skill_col_fmt = "skill_{}"
+
+        self.green_id_colname = "skill_green"
+        self.brown_id_colname = "skill_brown"
+        self.neutral_id_colname = "skill_neutral"
+
+        self.green_id_onet = "is_green_onet"
+        self.brown_id_onet = "is_brown_onet"
+        self.neutral_id_onet = "is_neutral_onet"
 
         # containers
         self.osm = None
@@ -114,6 +123,18 @@ class EscoDs(UsefulPaths):
         )
         green_skills[self.green_id_colname] = True
 
+        # ESCO brown skill labels
+        brown_skills = pd.read_excel(
+            os.path.join(
+                self.data_external,
+                "esco",
+                self.esco_version_newest,
+                "BrownSkillsKnowledge.xlsx",
+            )
+        )
+        brown_skills[self.brown_id_colname] = True
+
+        # ESCO skills hierarchies
         skills_hierarchy = pd.read_csv(
             os.path.join(
                 self.data_raw,
@@ -135,7 +156,7 @@ class EscoDs(UsefulPaths):
             )
         )
 
-        # skill groups
+        # ESCO skill groups
         skill_groups = pd.read_csv(
             os.path.join(
                 self.data_raw,
@@ -191,6 +212,7 @@ class EscoDs(UsefulPaths):
             "skills": skills,
             "occ_skills_mapping": occ_skills_mapping,
             "skills_green": green_skills,
+            "skills_brown": brown_skills,
             "skills_coreness": skills_coreness,
             "skills_hierarchy": skills_hierarchy,
             "skills_hierarchy_kanders": skills_hierarchy_kanders,
@@ -413,6 +435,7 @@ class EscoDs(UsefulPaths):
             # -------------------------------------------------------------------------
             # Green Skills
             # -------------------------------------------------------------------------
+            # TODO: refactor to static function
             # Find cols that are unique in green skills file compared to general
             # skills file: "The difference between A and B contains all elements that
             # are in A but not in B."
@@ -434,6 +457,40 @@ class EscoDs(UsefulPaths):
             skills_metadata = skills_metadata.fillna(
                 value={self.green_id_colname: False}
             )
+
+            # -------------------------------------------------------------------------
+            # Brown Skills
+            # -------------------------------------------------------------------------
+            # TODO: refactor to static function
+            set_diff = list(
+                set(self.data["skills_brown"].columns.values.tolist())
+                - set(self.data["skills"].columns.values.tolist())
+            )
+            set_diff.insert(0, "conceptUri")
+
+            skills_metadata = skills_metadata.merge(
+                right=self.data["skills_brown"][set_diff],
+                on="conceptUri",
+                how="left",
+                validate="one_to_one",
+            )
+            skills_metadata = skills_metadata.fillna(
+                value={self.brown_id_colname: False}
+            )
+
+            # -------------------------------------------------------------------------
+            # Derive Neutral Skills
+            # -------------------------------------------------------------------------
+            # TODO: refactor to class function
+            skills_metadata[self.neutral_id_colname] = (
+                skills_metadata[self.green_id_colname] == False
+            ) & (skills_metadata[self.brown_id_colname] == False)
+
+            # sanity check
+            ambiguous_cases = (skills_metadata[self.brown_id_colname] == True) & (
+                skills_metadata[self.green_id_colname] == True
+            )
+            assert ambiguous_cases.sum() == 0
 
             # -------------------------------------------------------------------------
             # Coreness Metric
@@ -476,35 +533,63 @@ class EscoDs(UsefulPaths):
         return skills_metadata
 
     # todo: implement weighted form of esco-based greenness measure
-    def calc_greenness_skill_based(self, weighted=False):
+    def calc_gbn_shares_skill_based(self, weighted=False):
         osm = self.occupation_skills_matrix()
         occ_skills_matrix_unweighted = osm["osm_unweighted"]
 
         # number of occupation-specific skills
         n_total_specific_skills = occ_skills_matrix_unweighted.sum(axis=1).values
 
-        # number of occupation-specific green skills
-        green_specific_skills = (
-            occ_skills_matrix_unweighted.values
-            * self.data["skills_metadata"].skillGreen.astype(np.int8).values
-        )
-
-        n_green_specific_skills = green_specific_skills.sum(axis=1)
-
-        # greenness
-        greenness_esco = n_green_specific_skills / n_total_specific_skills
-
-        # create df
-        data = {
+        data_out = {
             "n_total_specific_skills": n_total_specific_skills,
-            "n_green_specific_skills": n_green_specific_skills,
-            "greenness_esco": greenness_esco,
         }
 
-        df_greenness_esco = pd.DataFrame(
-            index=occ_skills_matrix_unweighted.index, data=data
+        # calc occupational shares for each skill type
+        colnames = []
+        for skill_type in self.skill_types_gbn:
+            col = self.skill_col_fmt.format(skill_type)
+            colname_shares = "share_{}".format(skill_type)
+
+            # number of occupation-specific green/brown/neutral skills
+            specific_skills = (
+                occ_skills_matrix_unweighted.values
+                * self.data["skills_metadata"][col].astype(np.int8).values
+            )
+
+            n_partial_specific_skills = specific_skills.sum(axis=1)
+
+            # occupational share
+            occ_share = n_partial_specific_skills / n_total_specific_skills
+
+            # append to dict
+            data_out[
+                "n_{}_specific_skills".format(skill_type)
+            ] = n_partial_specific_skills
+            data_out[colname_shares] = occ_share
+            colnames.append(colname_shares)
+
+        df_occ_shares_per_skill_type = pd.DataFrame(
+            index=occ_skills_matrix_unweighted.index, data=data_out
         )
-        return df_greenness_esco.reset_index()
+
+        # check if shares sum to 100%
+        assert np.allclose(df_occ_shares_per_skill_type[colnames].sum(axis=1).values, 1)
+
+        # classify into discrete GBN categories
+        # TODO: check if only one True per col.
+        # TODO: rename to green/brown/neutral.
+        df_occ_shares_per_skill_type[
+            "gbn_classification_esco"
+        ] = df_occ_shares_per_skill_type[colnames].idxmax(axis=1)
+
+        # rename to green/brown/neutral.
+        df_occ_shares_per_skill_type["gbn_classification_esco"] = (
+            df_occ_shares_per_skill_type["gbn_classification_esco"]
+            .str.split(pat="_", expand=True)
+            .iloc[:, 1]
+        )
+
+        return df_occ_shares_per_skill_type.reset_index()
 
     def read_greenness_task_based(self):
         greenness_onet_gtp = pd.read_excel(
@@ -572,7 +657,7 @@ class EscoDs(UsefulPaths):
         brown_occs_vona2018["soc_code"] = brown_occs_vona2018["soc_code"] + ".00"
 
         # add brown occupation classification
-        brown_occs_vona2018["is_brown"] = np.ones(
+        brown_occs_vona2018[self.brown_id_onet] = np.ones(
             brown_occs_vona2018.shape[0], dtype=bool
         )
 
@@ -620,25 +705,17 @@ class EscoDs(UsefulPaths):
             # init container
             occ_metadata = self.data["occ"].copy()
 
-            # ESCO-based Greenness (skill-based, supply side)
-            df_greenness_esco = self.calc_greenness_skill_based()
-
-            # ONET-based Greenness (task-based, demand side)
+            # Read data sets
+            df_gbn_shares_esco = self.calc_gbn_shares_skill_based()
             df_greenness_onet_esco = self.read_greenness_task_based()
-
-            # ONET-based brown occupations
             df_brown_occs_vona2018_esco = self._read_brown_occupations_vona2018()
-
-            # ONET-based G/B/N classification
-            # TODO: implement
-
-            # TODO: join --> ONET job zone, COVID Exposure,
+            # TODO: join --> ONET job zone, COVID Exposure
 
             # merge variables to occupation df
 
             # ESCO-based
             occ_metadata = occ_metadata.merge(
-                right=df_greenness_esco,
+                right=df_gbn_shares_esco,
                 on="conceptUri",
                 how="left",
                 suffixes=["", "_y"],
@@ -664,32 +741,44 @@ class EscoDs(UsefulPaths):
                 validate="1:m",
             )
 
+            # ONET-based G/B/N classification
+
             # TODO: refactor to function
             # classify green  & neutral occupations (data from GTP covers more
             # occupations, therefore using those. correlation with Vona 2018
             # greenness scores ~ 1)
-            occ_metadata["is_green"] = occ_metadata.greenness_gtp > 0
-            occ_metadata["is_brown"] = occ_metadata["is_brown"].fillna(False)
-            occ_metadata["is_neutral"] = (occ_metadata.is_green == False) & (
-                occ_metadata.is_brown == False
+            # TODO: create class attributes for these new colnames
+            occ_metadata[self.green_id_onet] = occ_metadata.greenness_gtp > 0
+            occ_metadata[self.brown_id_onet] = occ_metadata[self.brown_id_onet].fillna(
+                False
             )
+            occ_metadata[self.neutral_id_onet] = (
+                occ_metadata[self.green_id_onet] == False
+            ) & (occ_metadata[self.brown_id_onet] == False)
 
             # 8ung: there are 30 occupations that have been matched to both brown and green
             # the neutral occupations are fine! have to make decision on where to map the
             # ambiguous cases
-            query_ambiguous_cases = (occ_metadata.is_brown == True) & (
-                occ_metadata.is_green == True
+            query_ambiguous_cases = (occ_metadata[self.brown_id_onet] == True) & (
+                occ_metadata[self.green_id_onet] == True
             )
 
             # define ambiguous cases as brown (see thesis)
-            occ_metadata.loc[query_ambiguous_cases, "is_green"] = False
+            occ_metadata.loc[query_ambiguous_cases, self.green_id_onet] = False
             # occ_metadata = occ_metadata.reset_index(drop=True)
 
             # create single classification column
-            # TODO: check if only one True per col
-            occ_metadata["classification_gbn"] = occ_metadata[
-                ["is_brown", "is_green", "is_neutral"]
+            # TODO: assert check if only one True per col.
+            occ_metadata["gbn_classification_onet"] = occ_metadata[
+                [self.brown_id_onet, self.green_id_onet, self.neutral_id_onet]
             ].idxmax(axis=1)
+
+            # rename to green/brown/neutral.
+            occ_metadata["gbn_classification_onet"] = (
+                occ_metadata["gbn_classification_onet"]
+                .str.split(pat="_", expand=True)
+                .iloc[:, 1]
+            )
 
             # filter out duplicate columns
             occ_metadata = occ_metadata.drop(
@@ -697,7 +786,7 @@ class EscoDs(UsefulPaths):
             )
 
             # check if all occs are classified
-            assert occ_metadata["classification_gbn"].isna().sum() == 0
+            assert occ_metadata["gbn_classification_onet"].isna().sum() == 0
 
             # note: comment line below for testing
             occ_metadata.to_csv(target_fpath)
