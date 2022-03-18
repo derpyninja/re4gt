@@ -38,7 +38,7 @@ lfs_eu:
     "COUNTRYW": "category",
     "REGIONW": "category",
     "FTPT": "category",
-    "REFYEAR": "int",
+    "REFYEAR": "category",
     "COUNTRY": "category",
     "REGION": "category",
     "DEGURBA": "category",

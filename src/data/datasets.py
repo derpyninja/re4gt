@@ -6,7 +6,7 @@ import pandas as pd
 import geopandas as gpd
 from tqdm import tqdm
 
-from src import UsefulPaths, utils
+from src import UsefulPaths, utils, stats_utils
 from src.utils import load_config
 
 
@@ -42,6 +42,8 @@ class EscoDs(UsefulPaths):
         # static params
         self.skill_types_gbn = ["green", "brown", "neutral"]
         self.skill_col_fmt = "skill_{}"
+        # note: formatting string below needs to start with "share"
+        self.gbn_share_fmt = "share_{type}_{ds}"
 
         self.green_id_colname = "skill_green"
         self.brown_id_colname = "skill_brown"
@@ -50,6 +52,15 @@ class EscoDs(UsefulPaths):
         self.green_id_onet = "is_green_onet"
         self.brown_id_onet = "is_brown_onet"
         self.neutral_id_onet = "is_neutral_onet"
+
+        # aggregation of occupation data
+        # TODO: add agg func for discrete GBN classifications
+        self.agg_func_dict = {
+            "mean": np.nanmean,
+            "std": np.nanstd,
+            "median": np.nanmedian,
+            "iqr": stats_utils.naniqr,
+        }
 
         # containers
         self.osm = None
@@ -65,7 +76,7 @@ class EscoDs(UsefulPaths):
         # decompose isco 4-digit level
         for lvl in [1, 2, 3]:
             crosswalk["isco_level_{}".format(lvl)] = (
-                crosswalk["isco_level_4"].astype(str).str[:1].astype(int)
+                crosswalk["isco_level_4"].astype(str).str[:lvl].astype(int)
             )
         return crosswalk
 
@@ -534,8 +545,10 @@ class EscoDs(UsefulPaths):
 
     # todo: implement weighted form of esco-based greenness measure
     def calc_gbn_shares_skill_based(self, weighted=False):
+        # read
         osm = self.occupation_skills_matrix()
         occ_skills_matrix_unweighted = osm["osm_unweighted"]
+        self.skills_metadata()
 
         # number of occupation-specific skills
         n_total_specific_skills = occ_skills_matrix_unweighted.sum(axis=1).values
@@ -548,7 +561,7 @@ class EscoDs(UsefulPaths):
         colnames = []
         for skill_type in self.skill_types_gbn:
             col = self.skill_col_fmt.format(skill_type)
-            colname_shares = "share_{}".format(skill_type)
+            colname_shares = self.gbn_share_fmt.format(type=skill_type, ds="esco")
 
             # number of occupation-specific green/brown/neutral skills
             specific_skills = (
@@ -645,7 +658,6 @@ class EscoDs(UsefulPaths):
 
         return greenness_onet_esco
 
-    # TODO: implement
     def _read_brown_occupations_vona2018(self):
         brown_occs_vona2018 = pd.read_csv(
             os.path.join(
@@ -683,11 +695,11 @@ class EscoDs(UsefulPaths):
 
         return brown_occs_vona2018_esco
 
-    # TODO: implement
+    # TODO: refactor code from other functions
     def classify_occupations_gbn(self):
         pass
 
-    def occupation_metadata(self):
+    def merge_occupation_metadata(self):
         """
 
         Returns
@@ -704,6 +716,16 @@ class EscoDs(UsefulPaths):
         if not os.path.exists(target_fpath):
             # init container
             occ_metadata = self.data["occ"].copy()
+
+            # merge onet codes and names via crosswalk
+            occ_metadata = occ_metadata.merge(
+                right=self.onet_esco_crosswalk,
+                left_on="conceptUri",
+                right_on="concept_uri",
+                how="left",
+                suffixes=["", "_y"],
+                validate="1:1",
+            )
 
             # Read data sets
             df_gbn_shares_esco = self.calc_gbn_shares_skill_based()
@@ -747,18 +769,18 @@ class EscoDs(UsefulPaths):
             # classify green  & neutral occupations (data from GTP covers more
             # occupations, therefore using those. correlation with Vona 2018
             # greenness scores ~ 1)
-            # TODO: create class attributes for these new colnames
-            occ_metadata[self.green_id_onet] = occ_metadata.greenness_gtp > 0
+            occ_metadata[self.green_id_onet] = (
+                occ_metadata[self.gbn_share_fmt.format(type="green", ds="gtp")] > 0
+            )
             occ_metadata[self.brown_id_onet] = occ_metadata[self.brown_id_onet].fillna(
                 False
             )
+
             occ_metadata[self.neutral_id_onet] = (
                 occ_metadata[self.green_id_onet] == False
             ) & (occ_metadata[self.brown_id_onet] == False)
 
-            # 8ung: there are 30 occupations that have been matched to both brown and green
-            # the neutral occupations are fine! have to make decision on where to map the
-            # ambiguous cases
+            # there are 30 occupations that have been matched to both brown and green
             query_ambiguous_cases = (occ_metadata[self.brown_id_onet] == True) & (
                 occ_metadata[self.green_id_onet] == True
             )
@@ -789,11 +811,83 @@ class EscoDs(UsefulPaths):
             assert occ_metadata["gbn_classification_onet"].isna().sum() == 0
 
             # note: comment line below for testing
+            self.data["occ_metadata"] = occ_metadata
             occ_metadata.to_csv(target_fpath)
         else:
-            occ_metadata = pd.read_csv(target_fpath)
-
+            occ_metadata = pd.read_csv(target_fpath, index_col=0)
+            self.data["occ_metadata"] = occ_metadata
         return occ_metadata
+
+    # todo (minor): add COVID and automation-related data to agg process
+    def aggregate_occ_data_by_isco(
+        self,
+        isco08_digits=[1, 2, 3, 4],
+        use_weights=False,
+    ):
+        occ = self.merge_occupation_metadata().copy()
+        occ["n_occ_esco"] = np.ones(len(occ))
+
+        # one csv per isco level
+        target_fpath_csv_fmt = os.path.join(
+            self.data_interim,
+            "esco",
+            self.esco_version,
+            "occ_metadata_{esco_lang}_isco08_{digits}_digit.csv",
+        )
+
+        # dict storing data across all agg levels
+        target_fpath_pkl = os.path.join(
+            self.data_interim,
+            "esco",
+            self.esco_version,
+            "occ_metadata_{esco_lang}_isco08_all_digit.pkl",
+        ).format(esco_lang=self.esco_language)
+
+        # TODO: add ONET-based GBN data
+        agg_funcs = list(self.agg_func_dict.values())
+        agg_dict = {
+            "share_green_gtp": agg_funcs,
+            "n_occ_esco": np.sum,
+        }
+        for skill_type in self.skill_types_gbn:
+            agg_dict[self.gbn_share_fmt.format(type=skill_type, ds="esco")] = agg_funcs
+
+        occ_data_dict_agg = {}
+        for n_digits in isco08_digits:
+            group_var = "isco_level_{}".format(n_digits)
+
+            target_fpath_csv = target_fpath_csv_fmt.format(
+                esco_lang=self.esco_language, digits=n_digits
+            )
+
+            if not os.path.exists(target_fpath_csv):
+                # aggregate
+                if not use_weights:
+                    occ_grouped = occ.groupby(group_var).agg(agg_dict)
+                else:
+                    raise NotImplementedError("TODO: implement weighted aggregation")
+
+                # rename cols
+                occ_grouped.columns = [
+                    "_".join(col).replace("nan", "") for col in occ_grouped.columns
+                ]
+
+                # reset index and downcast grouping id to integer
+                occ_grouped = occ_grouped.reset_index()
+                occ_grouped[group_var] = occ_grouped[group_var].astype("int")
+
+                # append to dict
+                occ_data_dict_agg[group_var] = occ_grouped
+
+                # save to csv for checks and vis
+                occ_grouped.to_csv(target_fpath_csv)
+
+        if not os.path.exists(target_fpath_pkl):
+            pd.to_pickle(obj=occ_data_dict_agg, filepath_or_buffer=target_fpath_pkl)
+        else:
+            occ_data_dict_agg = pd.read_pickle(target_fpath_pkl)
+
+        return occ_data_dict_agg
 
 
 class LmData(UsefulPaths):
@@ -876,19 +970,24 @@ class LmData(UsefulPaths):
         return gpd.read_file(self.path_geodata_nuts)
 
 
-class EulfsDs(LmData):
+class EulfsDs(LmData, EscoDs):
     """EU LFS Dataset Class"""
 
     def __init__(self, fn_config_data, fn_config_path):
-        # inherit LmData
+        # inheritance
         LmData.__init__(
+            self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
+        )
+
+        EscoDs.__init__(
             self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
         )
 
         # static params
         self.fmt_folder = "{}_YEAR_1998_onwards"
         self.fmt_file = "{}{}_y.csv"
-        self.fmt_file_out = "eu_lfs_merged_{}.csv"
+        self.fmt_file_orig_vars_out = "eu_lfs_merged_{}.csv"
+        self.fmt_file_all_vars_out = "eu_lfs_merged_{}_with_covariates.csv"
 
         # read data configs
         self.config_data = utils.load_config(
@@ -896,6 +995,10 @@ class EulfsDs(LmData):
         )
 
         # assign vars
+        self.n_digits_isco08 = self.config_data["lfs_eu"]["n_digits_isco08"]
+        self.n_digits_nace = self.config_data["lfs_eu"]["n_digits_nace"]
+        self.n_digits_nuts = self.config_data["lfs_eu"]["n_digits_nuts"]
+
         # TODO: implement multiple years
         self.years = self.config_data["lfs_eu"]["years"]
         self.countries = self.config_data["lfs_eu"]["countries"]
@@ -903,20 +1006,33 @@ class EulfsDs(LmData):
         self.na_values = self.config_data["lfs_eu"]["na_values"]
         self.dtypes = self.config_data["lfs_eu"]["dtypes"]
 
+        # column name formatters
+        self.isco08_colname_other = "isco_level_{}".format(self.n_digits_isco08)
+        self.isco08_colname_eulfs = "ISCO{}D".format(self.n_digits_isco08)
+        self.nace_colname = "NACE{}D".format(self.n_digits_nace)
+
+        # read occupation metadata
+        self.occupation_metadata = self.merge_occupation_metadata()
+        self.occupation_metadata_agg = self.aggregate_occ_data_by_isco()
+        self.occupation_metadata_agg_subset = self.occupation_metadata_agg[
+            self.isco08_colname_other
+        ]
+
     def preprocess(self):
         """"""
         list_of_dfs = []
 
         for year in self.years:
+            # todo: remove/add [:1] after/before testing
             for country in self.countries:
-
+                print(country)
                 # define fpath
                 folder = self.fmt_folder.format(country)
                 file = self.fmt_file.format(country, year)
                 fpath_full = os.path.join(self.path_eulfs_raw_yf, folder, file)
 
                 # read raw data
-                df = pd.read_csv(
+                df_cy = pd.read_csv(
                     fpath_full,
                     usecols=self.variables,
                     na_values=self.na_values,
@@ -926,17 +1042,18 @@ class EulfsDs(LmData):
                     },
                 )
 
-                # filter based on conditions
-                cond_is_working = df.WSTATOR.isin(["1", "2"])  # beschäftigt
-                cond_private_household = df.HHTYPE.isin(["1"])  # privater wohnraum
-                cond_has_isco_code = df.ISCO3D.notna()
-                cond_not_inactive = df.ILOSTAT.isin(["1", "2"])  # inaktiv
-                cond_in_country = df.COUNTRYW.isin([country])  # pendler
-                cond_valid_region = df.REGIONW != "00"
-                cond_age = df.AGE <= 77  # (77 is the center of the 75-79 age band)
-                cond_military = ~df.ISCO3D.isin(["011"])  # military
+                # define filtering conditions
+                cond_is_working = df_cy.WSTATOR.isin(["1", "2"])  # beschäftigt
+                cond_private_household = df_cy.HHTYPE.isin(["1"])  # privater wohnraum
+                cond_has_isco_code = df_cy.ISCO3D.notna()
+                cond_not_inactive = df_cy.ILOSTAT.isin(["1", "2"])  # inaktiv
+                cond_in_country = df_cy.COUNTRYW.isin([country])  # pendler
+                cond_valid_region = df_cy.REGIONW != "00"
+                cond_age = df_cy.AGE <= 77  # (77 is the center of the 75-79 age band)
+                cond_military = ~df_cy.ISCO3D.isin(["011"])  # military
 
-                df_sub = df.loc[
+                # filter subset
+                df_sub = df_cy.loc[
                     cond_is_working
                     & cond_private_household
                     & cond_not_inactive
@@ -949,10 +1066,10 @@ class EulfsDs(LmData):
 
                 # remove categories that remain unused after filtering
                 # TODO: fix SettingWithCopyWarning
-                for col in df_sub.columns:
-                    if pd.api.types.is_categorical_dtype(df_sub[col]):
-                        df_sub.loc[:, col] = df_sub.loc[
-                            :, col
+                for col_name in df_sub.columns:
+                    if pd.api.types.is_categorical_dtype(df_sub[col_name]):
+                        df_sub.loc[:, col_name] = df_sub.loc[
+                            :, col_name
                         ].cat.remove_unused_categories()
 
                 # set NUTS code
@@ -965,23 +1082,90 @@ class EulfsDs(LmData):
 
         # Combine country-level data
         df_merged = pd.concat(list_of_dfs, axis=0).reset_index(drop=True)
+        # note: merging/concatenating does not preserve categorical dtypes
         df_merged = df_merged.astype(self.dtypes)
 
-        # Save to disk
-        # TODO: fix sluggish code regarding year formatting
+        # save merged LFS data only
+        # TODO: revert to pickling these files? or both csv and pk?
         df_merged.to_csv(
-            os.path.join(self.path_eulfs_interim, self.fmt_file_out.format(year))
+            os.path.join(
+                self.path_eulfs_interim, self.fmt_file_orig_vars_out.format(year)
+            )
         )
+
+        # merge covariates (ESCO, ONET)
+        # note: temporary trick to make merging work.
+        # todo: figure out role of dtypes in merging
+        df_merged[self.isco08_colname_eulfs] = df_merged[
+            self.isco08_colname_eulfs
+        ].astype(int)
+
+        # merge occupation metadata
+        df_merged_all_vars = pd.merge(
+            df_merged,
+            self.occupation_metadata_agg_subset,
+            left_on=self.isco08_colname_eulfs,
+            right_on=self.isco08_colname_other,
+            how="left",
+        )
+
+        # merge NACE code names
+        df_merged_all_vars = pd.merge(
+            df_merged_all_vars, self.df_nace, on=self.nace_colname, how="left"
+        )
+
+        # merge ISCO code names
+        # todo: implement
+        # df_merged_all_vars = pd.merge(
+        #     df_merged_all_vars, self.df_isco08, left_on=self.isco08_colname_eulfs,
+        #     right_on=self.isco08_colname_other, how="left"
+        # )
+
+        # calc absolute employment numbers from shares
+        # note: column names of variables that should be multiplied with COEFF need to
+        #  start with "share"
+        share_cols = df_merged_all_vars.columns[
+            df_merged_all_vars.columns.str.startswith("share")
+        ].values.tolist()
+
+        for col_name in share_cols:
+            col_name_new = "COEFF_{}".format(col_name)
+            df_merged_all_vars[col_name_new] = (
+                df_merged_all_vars[col_name] * df_merged_all_vars["COEFF"]
+            )
+
+        # Save to disk
+        # TODO: fix sluggish year formatting
+        # TODO: revert to pickling these files? or both csv and pk?
+        df_merged_all_vars.to_csv(
+            os.path.join(
+                self.path_eulfs_interim, self.fmt_file_all_vars_out.format(year)
+            )
+        )
+
+    def read(self, year=2019, covariates=True):
+        if covariates:
+            fpath = os.path.join(
+                self.path_eulfs_interim, self.fmt_file_all_vars_out.format(year)
+            )
+        else:
+            fpath = os.path.join(
+                self.path_eulfs_interim, self.fmt_file_orig_vars_out.format(year)
+            )
+        # TODO: revert to pickling these files? or both csv and pk?
+        return pd.read_csv(fpath, index_col=0)
 
 
 if __name__ == "__main__":
     config_paths = "paths_config.yml"
     config_data = "data_config.yml"
 
-    lm_data = LmData(fn_config_path=config_paths, fn_config_data=config_data)
+    lm_data = EulfsDs(fn_config_path=config_paths, fn_config_data=config_data)
+    df = lm_data.occupation_metadata_agg
+    print(df["isco_level_3"].info())
 
-    df = lm_data.gdf_nuts
-    print(df)
+    # esco = EscoDs(fn_config_path=config_paths, fn_config_data=config_data)
+    # esco.aggregate_occ_data_by_isco()
 
     # class_vars = vars(lm_data)
     # for key, val in class_vars.items():
