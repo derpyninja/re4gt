@@ -45,6 +45,8 @@ def main(config_paths, config_data):
 
     eulfs.preprocess()
 
+    # todo: add aggregation by region, occupation and industry
+
 
 if __name__ == "__main__":
     log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

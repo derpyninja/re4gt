@@ -14,7 +14,8 @@ path_crosswalk:
   onet_esco: "data\\raw\\mapping-career-causeways\\codebase\\data\\processed\\ESCO_ONET_xwalk_full.csv"
 
 path_geodata:
-  nuts_2d: "data\\external\\geodata\\NUTS_RG_03M_2021_4326_LEVL_2\\NUTS_RG_03M_2021_4326_LEVL_2.shp"
+  nuts_3035: "data\\external\\geodata\\NUTS_RG_03M_2021_3035.shp"
+  nuts_4326: "data\\external\\geodata\\NUTS_RG_03M_2021_4326.shp"
 
 path_clsf:
   nace_1d: "data\\external\\classifications\\nace\\nace_rev2_1d_section_codes.csv"

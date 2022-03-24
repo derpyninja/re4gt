@@ -1,6 +1,7 @@
 import logging
 import os
 
+import copy
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -921,7 +922,8 @@ class LmData(UsefulPaths):
             self.config_data["ESCO"]["VERSION_NEWEST"]
         )
         self.path_clsf_nace = self.path_clsf_nace_1d
-        self.path_geodata_nuts = self.path_geodata_nuts_2d
+        self.path_geodata_nuts_3035 = self.path_geodata_nuts_3035
+        self.path_geodata_nuts_4326 = self.path_geodata_nuts_4326
 
         # read relevant data across 3 dimensions: industry, occupation, region
         self.df_isco08 = self._read_isco08()
@@ -967,7 +969,10 @@ class LmData(UsefulPaths):
         return pd.read_csv(self.path_clsf_nace, delimiter=";")
 
     def _read_nuts(self):
-        return gpd.read_file(self.path_geodata_nuts)
+        return {
+            "3035": gpd.read_file(self.path_geodata_nuts_3035),
+            "4326": gpd.read_file(self.path_geodata_nuts_4326),
+        }
 
 
 class EulfsDs(LmData, EscoDs):
