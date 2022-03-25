@@ -13,6 +13,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
     # Preprocessing
-    preprocess.main(config_paths=config_paths, config_data=config_data)
+    # preprocess.main(config_paths=config_paths, config_data=config_data)
 
     # Visualisation
+    visualize.main(
+        config_paths=config_paths, config_data=config_data, config_vis=config_vis
+    )

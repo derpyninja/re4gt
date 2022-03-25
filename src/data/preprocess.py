@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
-from src.data.datasets import EscoDs, EulfsDs
+from src.data.lfs import EulfsDs
+from src.data.esco import EscoDs
 
 
 # note: need to uncomment click commands for CLI usage
@@ -11,14 +12,14 @@ from src.data.datasets import EscoDs, EulfsDs
 def main(config_paths, config_data):
     """
     Runs data processing scripts to turn raw data from (../raw) into
-    cleaned data ready to be analyzed (saved in ../processed).
+    preprocessed data (saved in ../interim).
 
     Parameters
     ----------
     config_paths : str
-        Name of yml file containing pre-processing configurations.
+        Name of yml file containing path configurations.
     config_data : str
-        TODO
+        Name of yml file containing data configurations.
     Returns
     -------
     None
