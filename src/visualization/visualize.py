@@ -309,13 +309,25 @@ class EulfsVis(EulfsDs):
             "COEFF_share_neutral_esco_mean_relative",
         ]
 
-        y_var = "NACE1D_label"
+        y_var = "NACE{}D_label".format(self.n_digits_nace)
         hue_var = "COUNTRYW"
 
-        n_colors = len(df_all_agg_by_cntr_ind[hue_var].unique())
-        palette = sns.color_palette("cubehelix", n_colors=n_colors)
+        n_hue_colors = len(df_all_agg_by_cntr_ind[hue_var].unique())
+        palette = sns.color_palette("cubehelix", n_colors=n_hue_colors)
 
         for x_var in plotting_cols:
+            print("plotting variable: {}".format(x_var))
+
+            # infer order (sorted by median in descending order)
+            plotting_order = (
+                df_all_agg_by_cntr_ind.loc[:, (y_var, x_var)]
+                .groupby(y_var)
+                .median()
+                .sort_values(by=x_var, ascending=False)
+                .index.values
+            )
+
+            # create plot
             fig, ax = plt.subplots(figsize=(20, 10))
 
             sns.boxplot(
@@ -323,16 +335,37 @@ class EulfsVis(EulfsDs):
                 x=x_var,
                 y=y_var,
                 color=".5",
+                fliersize=0,
+                order=plotting_order,
             )
 
-            sns.stripplot(
-                data=df_all_agg_by_cntr_ind,
+            sns.scatterplot(
+                data=df_all_agg_by_cntr_ind.set_index([y_var, hue_var])
+                .reindex(plotting_order, level=0)
+                .reset_index(),
                 x=x_var,
                 y=y_var,
                 hue=hue_var,
+                style=hue_var,
                 palette=palette,
+                zorder=5,
+                edgecolor="black"
+                # order=plotting_order,
             )
 
+            # labelling
+
+            # Shrink current axis by x %
+            shrinkage_factor = 0.2
+            box = ax.get_position()
+            ax.set_position(
+                [box.x0, box.y0, box.width * (1 - shrinkage_factor), box.height]
+            )
+
+            # Put a legend to the right of the current axis
+            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+            ax.grid(axis="x", linestyle="--", zorder=0)
             ax.set_xlabel("{} ({})".format(x_var, self.year))
             sns.despine()
 
@@ -353,7 +386,7 @@ class EulfsVis(EulfsDs):
 
             plt.close(fig)
 
-    def create_occupation_barplots(self):
+    def create_occupation_barplots(self, n_occ="all"):
         logger = logging.getLogger(__name__)
         logger.info("GBN employment shares by occupation.")
 
@@ -373,24 +406,81 @@ class EulfsVis(EulfsDs):
         palette = sns.color_palette("cubehelix", n_colors=n_colors)
 
         for x_var in plotting_cols:
-            fig, ax = plt.subplots(figsize=(5, 20))
+            print("plotting variable: {}".format(x_var))
 
-            sns.boxplot(
-                data=df_all_agg_by_cntr_occ,
-                x=x_var,
-                y=y_var,
-                color=".5",
+            # infer order (sorted by median in descending order)
+            plotting_order = (
+                df_all_agg_by_cntr_occ.loc[:, (y_var, x_var)]
+                .groupby(y_var)
+                .median()
+                .sort_values(by=x_var, ascending=False)
+                .index.values
             )
 
-            sns.stripplot(
-                data=df_all_agg_by_cntr_occ,
+            # extract and reorder data
+            plotting_data = (
+                df_all_agg_by_cntr_occ.set_index([y_var, hue_var])
+                .reindex(plotting_order, level=0)
+                .reset_index()
+            )
+
+            if n_occ != "all":
+                plotting_data = plotting_data.head(n_occ * len(self.countries))
+                figsize = (10, n_occ / 2)
+                x_min = 0
+            else:
+                figsize = (10, 20)
+                x_min = None
+
+            fig, ax = plt.subplots(figsize=figsize)
+
+            # sns.boxplot(
+            #     data=df_all_agg_by_cntr_occ,
+            #     x=x_var,
+            #     y=y_var,
+            #     color=".5",
+            #     fliersize=5,
+            #     order=plotting_order,
+            # )
+
+            # sns.pointplot(
+            #     data=df_all_agg_by_cntr_occ.set_index([y_var, hue_var])
+            #         .reindex(plotting_order, level=0)
+            #         .reset_index(),
+            #     x=x_var,
+            #     y=y_var,
+            #     join=False,
+            #     scale=0.5,
+            #     estimator=np.median,
+            # )
+
+            sns.scatterplot(
+                data=plotting_data,
                 x=x_var,
                 y=y_var,
                 hue=hue_var,
+                style=hue_var,
                 palette=palette,
+                zorder=5,
+                edgecolor="black"
+                # order=plotting_order,
             )
 
+            # labelling
+
+            # Shrink current axis by x %
+            shrinkage_factor = 0.2
+            box = ax.get_position()
+            ax.set_position(
+                [box.x0, box.y0, box.width * (1 - shrinkage_factor), box.height]
+            )
+
+            # Put a legend to the right of the current axis
+            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+            ax.grid(axis="x", linestyle="--", zorder=0)
             ax.set_xlabel("{} ({})".format(x_var, self.year))
+            ax.set_xlim(xmin=x_min)
             sns.despine()
 
             # save
@@ -403,7 +493,7 @@ class EulfsVis(EulfsDs):
             utils.ccdir(out_dir)
 
             plt.savefig(
-                os.path.join(out_dir, "{}.png".format(x_var)),
+                os.path.join(out_dir, "{}_n_{}.png".format(x_var, n_occ)),
                 dpi=150,
                 bbox_inches="tight",
             )
@@ -434,18 +524,7 @@ def main(config_paths, config_data, config_vis):
     """
     logger = logging.getLogger(__name__)
     logger.info("Creating data visualisations.")
-
-    # EU-LFS data
-    eulfs_visualiser = EulfsVis(
-        fn_config_data=config_data,
-        fn_config_path=config_paths,
-        fn_vis_config=config_vis,
-        year=2019,
-    )
-
-    # eulfs_visualiser.create_maps()
-    # eulfs_visualiser.create_industry_barplots()
-    eulfs_visualiser.create_occupation_barplots()
+    pass
 
 
 if __name__ == "__main__":

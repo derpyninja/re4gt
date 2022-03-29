@@ -60,20 +60,13 @@ class LmData(UsefulPaths):
         # read original data from ESCO
         fpath = self.path_clsf_isco08.format(self.config_data["ESCO"]["VERSION_NEWEST"])
         df_isco = pd.read_csv(
-            fpath,
-            usecols=["code", "preferredLabel"],
+            fpath, usecols=["code", "preferredLabel"], dtype={"code": "str"}
         )
 
         # subset depending on desired granularity
         df_isco = df_isco.loc[
-            df_isco.code.astype(str).str.len() <= self.n_digits_isco08
+            df_isco.code.str.len() == self.n_digits_isco08
         ].reset_index(drop=True)
-
-        # format and pad
-        df_isco.code = df_isco.code.astype(int)
-        # df_isco.code = df_isco.code.str.pad(
-        #     width=self.n_digits_isco08, side="left", fillchar="0"
-        # )
 
         # rename
         df_isco = df_isco.rename(
@@ -119,6 +112,7 @@ class EulfsDs(LmData, EscoDs):
         )
 
         # assign vars
+        self.scaling_factor_coeff = self.config_data["lfs_eu"]["scaling_factor_coeff"]
         self.n_digits_isco08 = self.config_data["lfs_eu"]["n_digits_isco08"]
         self.n_digits_nace = self.config_data["lfs_eu"]["n_digits_nace"]
         self.n_digits_nuts = self.config_data["lfs_eu"]["n_digits_nuts"]
@@ -128,7 +122,8 @@ class EulfsDs(LmData, EscoDs):
         self.countries = self.config_data["lfs_eu"]["countries"]
         self.variables = self.config_data["lfs_eu"]["variables"]
         self.na_values = self.config_data["lfs_eu"]["na_values"]
-        self.dtypes = self.config_data["lfs_eu"]["dtypes"]
+        self.dtypes_in = self.config_data["lfs_eu"]["dtypes_in"]
+        self.dtypes_out = self.config_data["lfs_eu"]["dtypes_out"]
 
         # column name formatters
         self.isco08_colname_other = "isco_level_{}".format(self.n_digits_isco08)
@@ -145,8 +140,10 @@ class EulfsDs(LmData, EscoDs):
     def preprocess(self):
         """"""
         list_of_dfs = []
+        summary_stats = {}
 
         for year in self.years:
+            print(year)
             for country in self.countries:
                 # todo: remove/add [:1] above after/before testing
                 print(country)
@@ -160,73 +157,70 @@ class EulfsDs(LmData, EscoDs):
                     fpath_full,
                     usecols=self.variables,
                     na_values=self.na_values,
-                    dtype=self.dtypes,
-                    converters={
-                        "COEFF": lambda x: float(x) * 1000 if x != "" else np.nan
-                    },
+                    # categories make more sense to deal with na values
+                    dtype=self.dtypes_in,
                 )
 
+                # apply scaling factor to COEFF
+                df_cy["COEFF"] *= self.scaling_factor_coeff
+
                 # define filtering conditions
+                cond_coeff_is_not_zero = ~np.isclose(df_cy["COEFF"], 0)
                 cond_is_working = df_cy.WSTATOR.isin(["1", "2"])  # beschäftigt
                 cond_private_household = df_cy.HHTYPE.isin(["1"])  # privater wohnraum
                 cond_has_isco_code = df_cy.ISCO3D.notna()
                 cond_not_inactive = df_cy.ILOSTAT.isin(["1", "2"])  # inaktiv
                 cond_in_country = df_cy.COUNTRYW.isin([country])  # pendler
-                cond_valid_region = df_cy.REGIONW != "00"
-                cond_age = df_cy.AGE <= 77  # (77 is the center of the 75-79 age band)
-                cond_military = ~df_cy.ISCO3D.isin(["011"])  # military
+                cond_valid_region = df_cy.REGIONW.notna()  # mapped to region
+                # remove retirement age (77 is the center of the 75-79 age band)
+                cond_age = ~df_cy.AGE.isin(["77"])
+                # spare out military sector
+                # cond_military = ~df_cy.ISCO3D.isin(["011", "021", "031"])
 
                 # filter subset
                 df_sub = df_cy.loc[
-                    cond_is_working
+                    cond_coeff_is_not_zero
+                    & cond_is_working
                     & cond_private_household
                     & cond_not_inactive
                     & cond_in_country
                     & cond_valid_region
                     & cond_has_isco_code
-                    & cond_military
                     & cond_age
                 ]
 
-                # remove categories that remain unused after filtering
-                # TODO: fix SettingWithCopyWarning
-                for col_name in df_sub.columns:
-                    if pd.api.types.is_categorical_dtype(df_sub[col_name]):
-                        df_sub.loc[:, col_name] = df_sub.loc[
-                            :, col_name
-                        ].cat.remove_unused_categories()
-
                 # set NUTS code
-                df_sub.loc[:, "NUTS_ID"] = df_sub.loc[:, "COUNTRYW"].astype(
-                    str
-                ) + df_sub.loc[:, "REGIONW"].astype(str)
+                df_sub.loc[:, "NUTS_ID"] = (
+                    df_sub.loc[:, "COUNTRYW"] + df_sub.loc[:, "REGIONW"]
+                )
 
                 # append clean df
                 list_of_dfs.append(df_sub)
 
-        # Combine country-level data
-        # note: merging/concatenating does not preserve categorical dtypes
-        df_merged = pd.concat(list_of_dfs, axis=0).reset_index(drop=True)
-        df_merged = df_merged.astype(self.dtypes)
+                # populate summary stats
+                summary_stats["{}_{}".format(country, year)] = {
+                    "n_obs_before": len(df_cy),
+                    "n_obs_after": len(df_sub),
+                    "ratio": len(df_sub) / len(df_cy),
+                }
 
-        # save merged LFS data w/o additional covariates
+        # 1) Combine country-level data
+        # note: concatenating does not (always) preserve categorical dtypes
+        df_merged = pd.concat(list_of_dfs, axis=0).reset_index(drop=True)
+
+        # 2) save merged LFS data w/o additional covariates
         utils.save_df_to_files(
-            df=df_merged,
+            df=df_merged.astype(self.dtypes_out),
             output_dir=self.path_eulfs_interim,
             fname_no_ext=self.fmt_file_orig_vars_out.format(year),
         )
 
-        # merge covariates (ESCO, ONET)
-        # note: temporary trick to make merging work.
-        # todo: figure out role of dtypes in merging
-        df_merged[self.isco08_colname_eulfs] = df_merged[
-            self.isco08_colname_eulfs
-        ].astype(int)
+        # 3) merge covariates (ESCO, ONET)
 
         # merge occupation metadata on ISCO code
         df_merged_all_vars = pd.merge(
-            df_merged,
-            self.occupation_metadata_agg_subset,
+            left=df_merged,
+            right=self.occupation_metadata_agg_subset,
             left_on=self.isco08_colname_eulfs,
             right_on=self.isco08_colname_other,
             how="left",
@@ -255,12 +249,30 @@ class EulfsDs(LmData, EscoDs):
                 df_merged_all_vars[col_name] * df_merged_all_vars["COEFF"]
             )
 
-        # Save to disk
+        # note: missing values remain (subsistence agriculture: 631, 632, 633)
+        # 4) Save to disk
         utils.save_df_to_files(
-            df=df_merged_all_vars,
+            df=df_merged_all_vars.astype(dtype=self.dtypes_out),
             output_dir=self.path_eulfs_interim,
             fname_no_ext=self.fmt_file_all_vars_out.format(year),
         )
+
+        # save preprocessing stats (missing obs)
+        df_summary_stats = pd.DataFrame.from_dict(summary_stats).T
+        df_summary_stats.to_csv(
+            os.path.join(
+                self.path_eulfs_interim,
+                "eu_lfs_preprocessing_stats_{}.csv".format(year),
+            )
+        )
+
+        # remove categories that remain unused after filtering
+        # TODO: fix SettingWithCopyWarning
+        # for col_name in df_merged.columns:
+        #     if pd.api.types.is_categorical_dtype(df_merged[col_name]):
+        #         df_merged.loc[:, col_name] = df_merged.loc[
+        #             :, col_name
+        #         ].cat.remove_unused_categories()
 
     def read(self, year=None, covariates=True, ffmt="pkl"):
         if covariates:
@@ -285,13 +297,5 @@ if __name__ == "__main__":
     config_paths = "paths_config.yml"
     config_data = "data_config.yml"
 
-    lm_data = EulfsDs(fn_config_path=config_paths, fn_config_data=config_data)
-    df = lm_data.occupation_metadata_agg
-    print(df["isco_level_3"].info())
-
-    # esco = EscoDs(fn_config_path=config_paths, fn_config_data=config_data)
-    # esco.aggregate_occ_data_by_isco()
-
-    # class_vars = vars(lm_data)
-    # for key, val in class_vars.items():
-    #     print(key, val)
+    eulfs = EulfsDs(fn_config_path=config_paths, fn_config_data=config_data)
+    eulfs.preprocess()

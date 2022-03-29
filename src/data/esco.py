@@ -71,14 +71,7 @@ class EscoDs(UsefulPaths):
         self.data = self._read()
 
     def _read_crosswalk_to_onet(self):
-        crosswalk = pd.read_csv(self.path_crosswalk_onet_esco)
-
-        # decompose isco 4-digit level
-        for lvl in [1, 2, 3]:
-            crosswalk["isco_level_{}".format(lvl)] = (
-                crosswalk["isco_level_4"].astype(str).str[:lvl].astype(int)
-            )
-        return crosswalk
+        return pd.read_csv(self.path_crosswalk_onet_esco)
 
     def _read(self):
         """
@@ -706,16 +699,33 @@ class EscoDs(UsefulPaths):
         -------
 
         """
-        target_fpath = os.path.join(
+        target_fpath_csv = os.path.join(
             self.data_interim,
             "esco",
             self.esco_version,
             "occ_metadata_{}.csv".format(self.esco_language),
         )
 
-        if not os.path.exists(target_fpath):
+        target_fpath_pkl = os.path.join(
+            self.data_interim,
+            "esco",
+            self.esco_version,
+            "occ_metadata_{}.pkl".format(self.esco_language),
+        )
+
+        if not os.path.exists(target_fpath_pkl):
             # init container
             occ_metadata = self.data["occ"].copy()
+
+            # decompose isco 4-digit level
+            occ_metadata["isco_level_4"] = (
+                occ_metadata["iscoGroup"]
+                .astype(str)
+                .str.pad(width=4, side="left", fillchar="0")
+            )
+            for lvl in [1, 2, 3]:
+                new_colname = "isco_level_{}".format(lvl)
+                occ_metadata[new_colname] = occ_metadata["isco_level_4"].str[0:lvl]
 
             # merge onet codes and names via crosswalk
             occ_metadata = occ_metadata.merge(
@@ -812,9 +822,10 @@ class EscoDs(UsefulPaths):
 
             # note: comment line below for testing
             self.data["occ_metadata"] = occ_metadata
-            occ_metadata.to_csv(target_fpath)
+            occ_metadata.to_csv(target_fpath_csv)
+            occ_metadata.to_pickle(target_fpath_pkl)
         else:
-            occ_metadata = pd.read_csv(target_fpath, index_col=0)
+            occ_metadata = pd.read_pickle(target_fpath_pkl)
             self.data["occ_metadata"] = occ_metadata
         return occ_metadata
 
@@ -872,9 +883,9 @@ class EscoDs(UsefulPaths):
                     "_".join(col).replace("nan", "") for col in occ_grouped.columns
                 ]
 
-                # reset index and downcast grouping id to integer
+                # reset index
                 occ_grouped = occ_grouped.reset_index()
-                occ_grouped[group_var] = occ_grouped[group_var].astype("int")
+                # occ_grouped[group_var] = occ_grouped[group_var].astype("int")
 
                 # append to dict
                 occ_data_dict_agg[group_var] = occ_grouped

@@ -1,6 +1,9 @@
 import logging
 from src.data import preprocess
 from src.visualization import visualize
+from src.data.lfs import EulfsDs
+from src.data.esco import EscoDs
+from src.visualization.visualize import EulfsVis
 
 # CONFIGS
 config_paths = "paths_config.yml"
@@ -12,10 +15,44 @@ if __name__ == "__main__":
     log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
+    # ---------------------------------------------------------------------------------
     # Preprocessing
-    # preprocess.main(config_paths=config_paths, config_data=config_data)
+    # ---------------------------------------------------------------------------------
 
+    # ESCO
+    # esco = EscoDs(
+    #     fn_config_path=config_paths,
+    #     fn_config_data=config_data,
+    # )
+    #
+    # esco.occupation_skills_matrix()
+    # esco.occupation_similarity_matrix()
+    # esco.skills_metadata()
+    # esco.merge_occupation_metadata()
+    # esco.aggregate_occ_data_by_isco()
+    #
+    # # EU-LFS
+    # eulfs = EulfsDs(
+    #     fn_config_path=config_paths,
+    #     fn_config_data=config_data,
+    # )
+    #
+    # eulfs.preprocess()
+
+    # ---------------------------------------------------------------------------------
     # Visualisation
-    visualize.main(
-        config_paths=config_paths, config_data=config_data, config_vis=config_vis
+    # ---------------------------------------------------------------------------------
+
+    # EU-LFS
+    eulfs_visualiser = EulfsVis(
+        fn_config_data=config_data,
+        fn_config_path=config_paths,
+        fn_vis_config=config_vis,
+        year=2019,
     )
+
+    eulfs_visualiser.create_maps()
+    eulfs_visualiser.create_occupation_barplots(n_occ="all")
+    eulfs_visualiser.create_occupation_barplots(n_occ=10)
+    eulfs_visualiser.create_occupation_barplots(n_occ=20)
+    eulfs_visualiser.create_industry_barplots()

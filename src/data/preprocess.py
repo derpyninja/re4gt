@@ -26,27 +26,7 @@ def main(config_paths, config_data):
     """
     logger = logging.getLogger(__name__)
     logger.info("Making interim data sets from raw data.")
-
-    # run pre-processing chain: ESCO
-    # esco = EscoDs(
-    #     fn_config_path=config_paths,
-    #     fn_config_data=config_data,
-    # )
-    #
-    # esco.occupation_skills_matrix()
-    # esco.occupation_similarity_matrix()
-    # esco.skills_metadata()
-    # esco.merge_occupation_metadata()
-
-    # run pre-processing chain: EU-LFS
-    eulfs = EulfsDs(
-        fn_config_path=config_paths,
-        fn_config_data=config_data,
-    )
-
-    eulfs.preprocess()
-
-    # todo: add aggregation by region, occupation and industry
+    pass
 
 
 if __name__ == "__main__":

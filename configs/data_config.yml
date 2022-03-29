@@ -19,6 +19,7 @@ lfs_eu:
   n_digits_nace: 1
   n_digits_nuts: 2
   years: ["2019"]
+  scaling_factor_coeff: 1000
   countries: [
     "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR",
     "HU", "IE", "IS", "IT", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE",
@@ -29,8 +30,47 @@ lfs_eu:
     "COUNTRY", "REGION", "DEGURBA", "HHTYPE", "AGE", "ILOSTAT", "EDUC4WN", "HATLEV1D",
     "MAINSTAT", "INCDECIL", "COEFF"
   ]
-  na_values: [9, 99, 999, 9999]
-  dtypes: {
+  # na_values: [9, 99, 999, 9999]
+  # no designated nan values for: AGE, HHTYPE, DEGURBA, COEFF
+  na_values: {
+    "WSTATOR": ["9"],
+    "SEX": ["9"],
+    "NACE1D": ["9"],
+    "ISCO3D": ["999"],
+    "COUNTRYW": ["99"],
+    "REGIONW": ["00", "99"],
+    "FTPT": ["9"],
+    "REFYEAR": ["9999"],
+    "COUNTRY": ["99"],
+    "REGION": ["00"],
+    "ILOSTAT": ["9"],
+    "EDUC4WN": ["9"],
+    "HATLEV1D": ["9"],
+    "MAINSTAT": ["9"],
+    "INCDECIL": ["99"]
+}
+  dtypes_in: {
+    "WSTATOR": "str",
+    "SEX": "str",
+    "NACE1D": "str",
+    "ISCO3D": "str",
+    "COUNTRYW": "str",
+    "REGIONW": "str",
+    "FTPT": "str",
+    "REFYEAR": "str",
+    "COUNTRY": "str",
+    "REGION": "str",
+    "DEGURBA": "str",
+    "HHTYPE": "str",
+    "AGE": "str",
+    "ILOSTAT": "str",
+    "EDUC4WN": "str",
+    "HATLEV1D": "str",
+    "MAINSTAT": "str",
+    "INCDECIL": "str",
+    "COEFF": "float"
+}
+  dtypes_out: {
     "WSTATOR": "category",
     "SEX": "category",
     "NACE1D": "category",
@@ -43,10 +83,11 @@ lfs_eu:
     "REGION": "category",
     "DEGURBA": "category",
     "HHTYPE": "category",
-    "AGE": "int",
+    "AGE": "category",
     "ILOSTAT": "category",
     "EDUC4WN": "category",
     "HATLEV1D": "category",
     "MAINSTAT": "category",
-    "INCDECIL": "float"
+    "INCDECIL": "category",
+    "COEFF": "float"
 }
