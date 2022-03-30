@@ -7,3 +7,8 @@ EU_MAPS:
   linewidth: 0.5
   robust_cmap_percentiles: [2, 98]
   cmap: "Greys"
+  countries_for_maps: [
+    "AT", "BE", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR",
+    "HU", "IE", "IS", "IT", "LT", "LU", "LV", "NL", "NO", "PT", "RO", "SE",
+    "SI", "SK", "UK"
+  ]

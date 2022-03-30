@@ -52,7 +52,7 @@ if __name__ == "__main__":
     )
 
     eulfs_visualiser.create_maps()
-    eulfs_visualiser.create_occupation_barplots(n_occ="all")
-    eulfs_visualiser.create_occupation_barplots(n_occ=10)
-    eulfs_visualiser.create_occupation_barplots(n_occ=20)
-    eulfs_visualiser.create_industry_barplots()
+    # eulfs_visualiser.create_occupation_barplots(n_occ="all")
+    # eulfs_visualiser.create_occupation_barplots(n_occ=10)
+    # eulfs_visualiser.create_occupation_barplots(n_occ=20)
+    # eulfs_visualiser.create_industry_barplots()

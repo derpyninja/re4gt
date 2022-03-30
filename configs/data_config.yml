@@ -18,20 +18,23 @@ lfs_eu:
   n_digits_isco08: 3
   n_digits_nace: 1
   n_digits_nuts: 2
-  years: ["2019"]
-  scaling_factor_coeff: 1000
+  years: ["2018"]
   countries: [
     "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR",
     "HU", "IE", "IS", "IT", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE",
     "SI", "SK", "UK"
   ]
+  countries_isco08_2d: ["BG", "PL"]
+  countries_isco08_1d: ["MT"]
+  countries_nuts_1d: ["UK"]
+  countries_nuts_0d: ["MT", "NL"]
+  scaling_factor_coeff: 1000
+  pension_age: [ '77', '82', '87', '92', '97' ]
   variables: [
     "WSTATOR", "SEX", "NACE1D", "ISCO3D", "COUNTRYW", "REGIONW", "FTPT", "REFYEAR",
     "COUNTRY", "REGION", "DEGURBA", "HHTYPE", "AGE", "ILOSTAT", "EDUC4WN", "HATLEV1D",
     "MAINSTAT", "INCDECIL", "COEFF"
   ]
-  # na_values: [9, 99, 999, 9999]
-  # no designated nan values for: AGE, HHTYPE, DEGURBA, COEFF
   na_values: {
     "WSTATOR": ["9"],
     "SEX": ["9"],

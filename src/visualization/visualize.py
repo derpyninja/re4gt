@@ -49,6 +49,7 @@ class EulfsVis(EulfsDs):
             "robust_cmap_percentiles"
         ]
         self.cmap = self.config_vis["EU_MAPS"]["cmap"]
+        self.countries_for_maps = self.config_vis["EU_MAPS"]["countries_for_maps"]
 
         # read country borders
         self.gdf_nuts_0 = self.gdf_nuts[self.epsg].loc[
@@ -96,30 +97,33 @@ class EulfsVis(EulfsDs):
         target_fpath = os.path.join(target_fdir, target_fname)
         utils.ccdir(target_fdir)
 
-        if not os.path.exists(target_fpath):
-            # get correct shapefile
-            gdf_digits_match = self.gdf_nuts[epsg].loc[
-                self.gdf_nuts[epsg]["LEVL_CODE"] == self.n_digits_nuts
-            ]
+        # get correct shapefile
+        # gdf_digits_match = self.gdf_nuts[epsg].loc[
+        #     self.gdf_nuts[epsg]["LEVL_CODE"] == self.n_digits_nuts
+        # ]
+        gdf_digits_match = self.gdf_nuts[epsg]
 
-            # aggregate over regions
-            df_all_agg = (
-                self.data_panel.groupby("NUTS_ID")[self.cols_to_calc_all]
-                .sum()
-                .reset_index()
-            )
+        # todo (!): move to visualisation instead of aggregation function
+        # subset countries to plot
+        data_panel = self.data_panel[self.data_panel["COUNTRYW"].isin(self.countries_for_maps)]
 
-            # combine
-            gdf_sub = pd.merge(gdf_digits_match, df_all_agg, on="NUTS_ID", how="left")
+        # aggregate over regions
+        df_all_agg = (
+            data_panel.groupby("NUTS_ID")[self.cols_to_calc_all]
+            .sum()
+            .reset_index()
+        )
 
-            # calculate relative shares at regional level
-            for col in self.cols_to_calc:
-                gdf_sub["{}_relative".format(col)] = gdf_sub[col] / gdf_sub["COEFF"]
+        # combine
+        gdf_sub = pd.merge(df_all_agg, gdf_digits_match, on="NUTS_ID", how="left")
+        gdf_sub = gpd.GeoDataFrame(gdf_sub, crs="EPSG:{}".format(self.epsg))
 
-            gdf_sub.to_file(target_fpath)
-        else:
-            gdf_sub = gpd.read_file(target_fpath)
+        # calculate relative shares at regional level
+        for col in self.cols_to_calc:
+            gdf_sub["{}_relative".format(col)] = gdf_sub[col] / gdf_sub["COEFF"]
 
+        # todo: work around colname length restriction stemming from fiona when saving
+        # gdf_sub.to_file(target_fpath)
         return gdf_sub
 
     def aggregate_by_industry(self):
@@ -136,26 +140,20 @@ class EulfsVis(EulfsDs):
         utils.ccdir(target_fdir)
         target_fpath = os.path.join(target_fdir, target_fname + ".pkl")
 
-        if not os.path.exists(target_fpath):
-            # aggregate over industries and countries
-            # todo: make more flexible to work with different NACE digit levels
-            df_all_agg_by_cntr_ind = (
-                self.data_panel.groupby(["NACE1D_label", "COUNTRYW"])[
-                    self.cols_to_calc_all
-                ]
-                .sum()
-                .reset_index()
+        # aggregate over industries and countries
+        # todo: make more flexible to work with different NACE digit levels
+        df_all_agg_by_cntr_ind = (
+            self.data_panel.groupby(["NACE1D_label", "COUNTRYW"])[self.cols_to_calc_all]
+            .sum()
+            .reset_index()
+        )
+
+        for col in self.cols_main:
+            df_all_agg_by_cntr_ind["{}_relative".format(col)] = (
+                df_all_agg_by_cntr_ind[col] / df_all_agg_by_cntr_ind["COEFF"]
             )
 
-            for col in self.cols_main:
-                df_all_agg_by_cntr_ind["{}_relative".format(col)] = (
-                    df_all_agg_by_cntr_ind[col] / df_all_agg_by_cntr_ind["COEFF"]
-                )
-
-            utils.save_df_to_files(df_all_agg_by_cntr_ind, target_fdir, target_fname)
-        else:
-            df_all_agg_by_cntr_ind = pd.read_pickle(target_fpath)
-
+        utils.save_df_to_files(df_all_agg_by_cntr_ind, target_fdir, target_fname)
         return df_all_agg_by_cntr_ind
 
     def aggregate_by_occupation(self):
@@ -176,24 +174,21 @@ class EulfsVis(EulfsDs):
         utils.ccdir(target_fdir)
         target_fpath = os.path.join(target_fdir, target_fname + ".pkl")
 
-        if not os.path.exists(target_fpath):
-            # aggregate over occupations and countries
-            df_all_agg_by_cntr_occ = (
-                self.data_panel.groupby(
-                    ["ISCO{}D_label".format(self.n_digits_isco08), "COUNTRYW"]
-                )[self.cols_to_calc_all]
-                .sum()
-                .reset_index()
+        # aggregate over occupations and countries
+        df_all_agg_by_cntr_occ = (
+            self.data_panel.groupby(
+                ["ISCO{}D_label".format(self.n_digits_isco08), "COUNTRYW"]
+            )[self.cols_to_calc_all]
+            .sum()
+            .reset_index()
+        )
+
+        for col in self.cols_main:
+            df_all_agg_by_cntr_occ["{}_relative".format(col)] = (
+                df_all_agg_by_cntr_occ[col] / df_all_agg_by_cntr_occ["COEFF"]
             )
 
-            for col in self.cols_main:
-                df_all_agg_by_cntr_occ["{}_relative".format(col)] = (
-                    df_all_agg_by_cntr_occ[col] / df_all_agg_by_cntr_occ["COEFF"]
-                )
-
-            utils.save_df_to_files(df_all_agg_by_cntr_occ, target_fdir, target_fname)
-        else:
-            df_all_agg_by_cntr_occ = pd.read_pickle(target_fpath)
+        utils.save_df_to_files(df_all_agg_by_cntr_occ, target_fdir, target_fname)
 
         return df_all_agg_by_cntr_occ
 
@@ -239,6 +234,7 @@ class EulfsVis(EulfsDs):
         xmin, xmax, ymin, ymax = self.bbox_eu_epsg_3035
 
         for column in cols_to_plot:
+            print(column)
             # create figure
             fig, ax = plt.subplots(figsize=figsize)
 
@@ -535,4 +531,16 @@ if __name__ == "__main__":
     config_data = "data_config.yml"
     config_vis = "vis_config.yml"
 
-    main(config_paths=config_paths, config_data=config_data, config_vis=config_vis)
+    # EU-LFS
+    eulfs_visualiser = EulfsVis(
+        fn_config_data=config_data,
+        fn_config_path=config_paths,
+        fn_vis_config=config_vis,
+        year=2019,
+    )
+
+    eulfs_visualiser.create_maps()
+    # eulfs_visualiser.create_occupation_barplots(n_occ="all")
+    # eulfs_visualiser.create_occupation_barplots(n_occ=10)
+    # eulfs_visualiser.create_occupation_barplots(n_occ=20)
+    # eulfs_visualiser.create_industry_barplots()

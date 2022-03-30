@@ -64,15 +64,21 @@ class LmData(UsefulPaths):
         )
 
         # subset depending on desired granularity
-        df_isco = df_isco.loc[
-            df_isco.code.str.len() == self.n_digits_isco08
-        ].reset_index(drop=True)
+        # df_isco = df_isco.loc[
+        #     df_isco.code.str.len() == self.n_digits_isco08
+        # ].reset_index(drop=True)
+
+        for lvl in [1, 2, 3, 4]:
+            df_sub = df_isco.loc[
+                df_isco.code.str.len() == lvl, "preferredLabel"
+            ].reindex(df_isco.index)
+            df_isco["ISCO{}D_label".format(lvl)] = df_sub
 
         # rename
         df_isco = df_isco.rename(
             columns={
-                "code": "ISCO{}D".format(self.n_digits_isco08),
-                "preferredLabel": "ISCO{}D_label".format(self.n_digits_isco08),
+                "code": "ISCO",
+                "preferredLabel": "ISCO_label",
             }
         )
         return df_isco
@@ -112,30 +118,39 @@ class EulfsDs(LmData, EscoDs):
         )
 
         # assign vars
-        self.scaling_factor_coeff = self.config_data["lfs_eu"]["scaling_factor_coeff"]
         self.n_digits_isco08 = self.config_data["lfs_eu"]["n_digits_isco08"]
         self.n_digits_nace = self.config_data["lfs_eu"]["n_digits_nace"]
         self.n_digits_nuts = self.config_data["lfs_eu"]["n_digits_nuts"]
 
-        # TODO: implement multiple years
         self.years = self.config_data["lfs_eu"]["years"]
         self.countries = self.config_data["lfs_eu"]["countries"]
+
+        # special cases
+        self.countries_isco08_2d = self.config_data["lfs_eu"]["countries_isco08_2d"]
+        self.countries_isco08_1d = self.config_data["lfs_eu"]["countries_isco08_1d"]
+        self.countries_nuts_1d = self.config_data["lfs_eu"]["countries_nuts_1d"]
+        self.countries_nuts_0d = self.config_data["lfs_eu"]["countries_nuts_0d"]
+
+        self.scaling_factor_coeff = self.config_data["lfs_eu"]["scaling_factor_coeff"]
+        self.pension_age = self.config_data["lfs_eu"]["pension_age"]
+
         self.variables = self.config_data["lfs_eu"]["variables"]
         self.na_values = self.config_data["lfs_eu"]["na_values"]
         self.dtypes_in = self.config_data["lfs_eu"]["dtypes_in"]
         self.dtypes_out = self.config_data["lfs_eu"]["dtypes_out"]
 
         # column name formatters
-        self.isco08_colname_other = "isco_level_{}".format(self.n_digits_isco08)
-        self.isco08_colname_eulfs = "ISCO{}D".format(self.n_digits_isco08)
+        self.isco08_colname_other = "ISCO"
+        self.isco08_colname_eulfs = "ISCO"
         self.nace_colname = "NACE{}D".format(self.n_digits_nace)
 
         # read occupation metadata
         self.occupation_metadata = self.merge_occupation_metadata()
+
         self.occupation_metadata_agg = self.aggregate_occ_data_by_isco()
-        self.occupation_metadata_agg_subset = self.occupation_metadata_agg[
-            self.isco08_colname_other
-        ]
+        # self.occupation_metadata_agg_subset = self.occupation_metadata_agg[
+        #     self.isco08_colname_other
+        # ]
 
     def preprocess(self):
         """"""
@@ -170,10 +185,17 @@ class EulfsDs(LmData, EscoDs):
                 cond_private_household = df_cy.HHTYPE.isin(["1"])  # privater wohnraum
                 cond_has_isco_code = df_cy.ISCO3D.notna()
                 cond_not_inactive = df_cy.ILOSTAT.isin(["1", "2"])  # inaktiv
-                cond_in_country = df_cy.COUNTRYW.isin([country])  # pendler
-                cond_valid_region = df_cy.REGIONW.notna()  # mapped to region
-                # remove retirement age (77 is the center of the 75-79 age band)
-                cond_age = ~df_cy.AGE.isin(["77"])
+
+                # exclude cross-border commuters
+                if country == "MT":
+                    # special case for malta
+                    df_cy.COUNTRYW = df_cy.COUNTRYW.replace("000-OWN COUNTRY", "MT")
+                cond_in_country = df_cy.COUNTRYW.isin([country])
+
+                # remove obs over retirement age
+                # (77 is the center of the 75-79 age band)
+                cond_age = ~df_cy.AGE.isin(self.pension_age)
+
                 # spare out military sector
                 # cond_military = ~df_cy.ISCO3D.isin(["011", "021", "031"])
 
@@ -184,15 +206,38 @@ class EulfsDs(LmData, EscoDs):
                     & cond_private_household
                     & cond_not_inactive
                     & cond_in_country
-                    & cond_valid_region
                     & cond_has_isco_code
                     & cond_age
                 ]
 
+                # copy
+                df_sub = df_sub.copy()
+
                 # set NUTS code
-                df_sub.loc[:, "NUTS_ID"] = (
-                    df_sub.loc[:, "COUNTRYW"] + df_sub.loc[:, "REGIONW"]
-                )
+                if country in self.countries_nuts_1d:
+                    # NUTS 1 only
+                    nuts_id = df_sub["COUNTRYW"] + df_sub["REGIONW"].str[:1]
+                elif country in self.countries_nuts_0d:
+                    # NUTS 0 only
+                    nuts_id = df_sub["COUNTRYW"]
+                else:
+                    # NUTS 2
+                    nuts_id = df_sub["COUNTRYW"] + df_sub["REGIONW"]
+
+                df_sub["NUTS_ID"] = nuts_id
+
+                # assign new ISCO column to differentiate 1D, 2D & 3D codes
+                if country in self.countries_isco08_2d:
+                    # 2D
+                    if df_sub["ISCO3D"].str.endswith("0").all():
+                        df_sub["ISCO"] = df_sub["ISCO3D"].str[:2]
+                elif country in self.countries_isco08_1d:
+                    # 1D
+                    if df_sub["ISCO3D"].str.endswith("00").all():
+                        df_sub["ISCO"] = df_sub["ISCO3D"].str[:1]
+                else:
+                    # 3D
+                    df_sub["ISCO"] = df_sub["ISCO3D"]
 
                 # append clean df
                 list_of_dfs.append(df_sub)
@@ -205,7 +250,6 @@ class EulfsDs(LmData, EscoDs):
                 }
 
         # 1) Combine country-level data
-        # note: concatenating does not (always) preserve categorical dtypes
         df_merged = pd.concat(list_of_dfs, axis=0).reset_index(drop=True)
 
         # 2) save merged LFS data w/o additional covariates
@@ -220,7 +264,7 @@ class EulfsDs(LmData, EscoDs):
         # merge occupation metadata on ISCO code
         df_merged_all_vars = pd.merge(
             left=df_merged,
-            right=self.occupation_metadata_agg_subset,
+            right=self.occupation_metadata_agg,
             left_on=self.isco08_colname_eulfs,
             right_on=self.isco08_colname_other,
             how="left",

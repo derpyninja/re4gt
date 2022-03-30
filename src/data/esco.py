@@ -839,11 +839,13 @@ class EscoDs(UsefulPaths):
         occ["n_occ_esco"] = np.ones(len(occ))
 
         # one csv per isco level
-        target_fpath_csv_fmt = os.path.join(
+        target_fpath_csv = os.path.join(
             self.data_interim,
             "esco",
             self.esco_version,
-            "occ_metadata_{esco_lang}_isco08_{digits}_digit.csv",
+            "occ_metadata_{esco_lang}_by_isco08.csv".format(
+                esco_lang=self.esco_language
+            ),
         )
 
         # dict storing data across all agg levels
@@ -851,8 +853,10 @@ class EscoDs(UsefulPaths):
             self.data_interim,
             "esco",
             self.esco_version,
-            "occ_metadata_{esco_lang}_isco08_all_digit.pkl",
-        ).format(esco_lang=self.esco_language)
+            "occ_metadata_{esco_lang}_by_isco08.pkl".format(
+                esco_lang=self.esco_language
+            ),
+        )
 
         # TODO: add ONET-based GBN data
         agg_funcs = list(self.agg_func_dict.values())
@@ -863,39 +867,61 @@ class EscoDs(UsefulPaths):
         for skill_type in self.skill_types_gbn:
             agg_dict[self.gbn_share_fmt.format(type=skill_type, ds="esco")] = agg_funcs
 
-        occ_data_dict_agg = {}
+        list_of_occ_data = []
         for n_digits in isco08_digits:
             group_var = "isco_level_{}".format(n_digits)
 
-            target_fpath_csv = target_fpath_csv_fmt.format(
-                esco_lang=self.esco_language, digits=n_digits
-            )
+            # aggregate
+            if not use_weights:
+                occ_grouped = occ.groupby(group_var).agg(agg_dict)
+            else:
+                raise NotImplementedError("TODO: implement weighted aggregation")
 
-            if not os.path.exists(target_fpath_csv):
-                # aggregate
-                if not use_weights:
-                    occ_grouped = occ.groupby(group_var).agg(agg_dict)
-                else:
-                    raise NotImplementedError("TODO: implement weighted aggregation")
+            # rename cols
+            occ_grouped.columns = [
+                "_".join(col).replace("nan", "") for col in occ_grouped.columns
+            ]
 
-                # rename cols
-                occ_grouped.columns = [
-                    "_".join(col).replace("nan", "") for col in occ_grouped.columns
-                ]
+            # reset index
+            occ_grouped = occ_grouped.reset_index()
 
-                # reset index
-                occ_grouped = occ_grouped.reset_index()
-                # occ_grouped[group_var] = occ_grouped[group_var].astype("int")
+            # fill nans in GTP columns with zeros
+            gtp_cols = occ_grouped.columns[
+                occ_grouped.columns.str.startswith("share_green_gtp")
+            ]
+            occ_grouped[gtp_cols] = occ_grouped[gtp_cols].fillna(0)
 
-                # append to dict
-                occ_data_dict_agg[group_var] = occ_grouped
+            # rename
+            occ_grouped["ISCO"] = occ_grouped[group_var]
+            # occ_grouped = occ_grouped.rename(columns={group_var: "ISCO"})
 
-                # save to csv for checks and vis
-                occ_grouped.to_csv(target_fpath_csv)
+            # append to dict
+            list_of_occ_data.append(occ_grouped)
 
-        if not os.path.exists(target_fpath_pkl):
-            pd.to_pickle(obj=occ_data_dict_agg, filepath_or_buffer=target_fpath_pkl)
-        else:
-            occ_data_dict_agg = pd.read_pickle(target_fpath_pkl)
+        df_out = pd.concat(list_of_occ_data, axis=0).reset_index(drop=True)
 
-        return occ_data_dict_agg
+        df_out.to_csv(target_fpath_csv)
+        df_out.to_pickle(target_fpath_pkl)
+        # if not os.path.exists(target_fpath_pkl):
+        #     pd.to_pickle(obj=df_out, filepath_or_buffer=target_fpath_pkl)
+        # else:
+        #     df_out = pd.read_pickle(target_fpath_pkl)
+
+        return df_out
+
+
+if __name__ == "__main__":
+    # CONFIGS
+    config_paths = "paths_config.yml"
+    config_data = "data_config.yml"
+    config_model = "model_config.yml"
+    config_vis = "vis_config.yml"
+
+    # ESCO
+    esco = EscoDs(
+        fn_config_path=config_paths,
+        fn_config_data=config_data,
+    )
+
+    df = esco.aggregate_occ_data_by_isco()
+    print(None)
