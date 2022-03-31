@@ -1,6 +1,5 @@
-import logging
 import os
-
+import logging
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -13,25 +12,24 @@ class EscoDs(UsefulPaths):
 
     def __init__(self, fn_config_data, fn_config_path):
         """
-        TODO: description
+        Initialise ESCO class based on configuration file settings.
 
         Parameters
         ----------
         fn_config_data : str
             Name of yml file with ESCO-specific configurations.
+        fn_config_path : str
+            Name of yml file storing additional path-specific configurations.
         """
         # inherit class storing useful paths
-        UsefulPaths.__init__(self=self, config_fname=fn_config_path)
+        UsefulPaths.__init__(self=self, fn_config_path=fn_config_path)
 
-        # TODO: dynamically assign class variables based on data config file?
+        # parse config file
         self.config_data = utils.load_config(
             os.path.join(self.config_dir, fn_config_data)
         )
 
-        # crosswalk to onet
-        self.onet_esco_crosswalk = self._read_crosswalk_to_onet()
-
-        # esco configurations
+        # language and versions
         self.esco_language = self.config_data["ESCO"]["LANGUAGE"]  # "en"
         self.esco_version = self.config_data["ESCO"]["VERSION"]  # "v1.0.3" or "v1.1.0"
         self.esco_version_newest = self.config_data["ESCO"]["VERSION_NEWEST"]
@@ -39,21 +37,23 @@ class EscoDs(UsefulPaths):
             "v1.0.8" if self.esco_version == "v1.0.3" else "v1.1.0"
         )
 
-        # static params
+        # additional static parameters
         self.skill_types_gbn = ["green", "brown", "neutral"]
         self.skill_col_fmt = "skill_{}"
         # note: formatting string below needs to start with "share"
         self.gbn_share_fmt = "share_{type}_{ds}"
 
+        # column names of GBN skills in ESCO
         self.green_id_colname = "skill_green"
         self.brown_id_colname = "skill_brown"
         self.neutral_id_colname = "skill_neutral"
 
+        # column names of GBN skills in O*NET
         self.green_id_onet = "is_green_onet"
         self.brown_id_onet = "is_brown_onet"
         self.neutral_id_onet = "is_neutral_onet"
 
-        # aggregation of occupation data
+        # functions for the aggregation of occupation data
         # TODO: add agg func for discrete GBN classifications
         self.agg_func_dict = {
             "mean": np.nanmean,
@@ -62,13 +62,16 @@ class EscoDs(UsefulPaths):
             "iqr": stats_utils.naniqr,
         }
 
-        # containers
+        # initialise containers
         self.osm = None
         self.osim = None
         self.data = None
 
         # read data
         self.data = self._read()
+
+        # crosswalk to onet
+        self.onet_esco_crosswalk = self._read_crosswalk_to_onet()
 
     def _read_crosswalk_to_onet(self):
         return pd.read_csv(self.path_crosswalk_onet_esco)

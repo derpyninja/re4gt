@@ -21,7 +21,7 @@ class LmData(UsefulPaths):
             Name of configuration file storing relevant paths.
         """
         # inherit path structure
-        UsefulPaths.__init__(self=self, config_fname=fn_config_path)
+        UsefulPaths.__init__(self=self, fn_config_path=fn_config_path)
 
         # read data configs
         self.config_data = utils.load_config(

@@ -105,13 +105,13 @@ class EulfsVis(EulfsDs):
 
         # todo (!): move to visualisation instead of aggregation function
         # subset countries to plot
-        data_panel = self.data_panel[self.data_panel["COUNTRYW"].isin(self.countries_for_maps)]
+        data_panel = self.data_panel[
+            self.data_panel["COUNTRYW"].isin(self.countries_for_maps)
+        ]
 
         # aggregate over regions
         df_all_agg = (
-            data_panel.groupby("NUTS_ID")[self.cols_to_calc_all]
-            .sum()
-            .reset_index()
+            data_panel.groupby("NUTS_ID")[self.cols_to_calc_all].sum().reset_index()
         )
 
         # combine

@@ -14,12 +14,12 @@ class UsefulPaths:
     https://github.com/nestauk/mapping-career-causeways/blob/main/mapping_career_causeways/__init__.py.
     """
 
-    def __init__(self, config_fname=None):
+    def __init__(self, fn_config_path=None):
         """
 
         Parameters
         ----------
-        config_fname : str
+        fn_config_path : str
             Name of yml file storing additional path-specific configurations.
         """
 
@@ -37,8 +37,8 @@ class UsefulPaths:
         self.config_dir = os.path.join(self.project_dir, "configs")
 
         # optionally parse config file params
-        if config_fname is not None:
-            config = load_config(os.path.join(self.config_dir, config_fname))
+        if fn_config_path is not None:
+            config = load_config(os.path.join(self.config_dir, fn_config_path))
             metadata = config["metadata"]
             config.pop("metadata")
 
@@ -128,7 +128,7 @@ def save_df_to_files(df, output_dir, fname_no_ext, ftypes=["csv", "pkl"]):
 
 
 if __name__ == "__main__":
-    paths = UsefulPaths(config_fname="paths_config.yml")
+    paths = UsefulPaths(fn_config_path="paths_config.yml")
 
     class_vars = vars(paths)
     for key, val in class_vars.items():
