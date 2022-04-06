@@ -499,6 +499,17 @@ class EscoDs(UsefulPaths):
             )
             assert ambiguous_cases.sum() == 0
 
+            # create skill classification column: green/brown/neutral
+            skills_metadata["skillClassification"] = skills_metadata[
+                [self.green_id_colname, self.brown_id_colname, self.neutral_id_colname]
+            ].idxmax(axis=1)
+
+            skills_metadata["skillClassification"] = (
+                skills_metadata["skillClassification"]
+                .str.split(pat="_", expand=True)
+                .iloc[:, 1]
+            )
+
             # -------------------------------------------------------------------------
             # Coreness Metric
             # -------------------------------------------------------------------------
@@ -534,8 +545,9 @@ class EscoDs(UsefulPaths):
             # save
             self.data["skills_metadata"] = skills_metadata
             skills_metadata.to_csv(target_path)
+
         else:
-            skills_metadata = pd.read_csv(target_path)
+            skills_metadata = pd.read_csv(target_path, index_col=0)
             self.data["skills_metadata"] = skills_metadata
         return skills_metadata
 
@@ -695,7 +707,7 @@ class EscoDs(UsefulPaths):
     def classify_occupations_gbn(self):
         pass
 
-    def merge_occupation_metadata(self):
+    def occupation_metadata(self):
         """
 
         Returns
@@ -838,7 +850,7 @@ class EscoDs(UsefulPaths):
         isco08_digits=[1, 2, 3, 4],
         use_weights=False,
     ):
-        occ = self.merge_occupation_metadata().copy()
+        occ = self.occupation_metadata().copy()
         occ["n_occ_esco"] = np.ones(len(occ))
 
         # one csv per isco level
@@ -926,5 +938,8 @@ if __name__ == "__main__":
         fn_config_data=config_data,
     )
 
-    df = esco.aggregate_occ_data_by_isco()
-    print(None)
+    # esco.occupation_skills_matrix()
+    # esco.occupation_similarity_matrix()
+    esco.skills_metadata()
+    # esco.merge_occupation_metadata()
+    # esco.aggregate_occ_data_by_isco()
