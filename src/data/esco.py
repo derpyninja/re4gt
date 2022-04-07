@@ -707,7 +707,7 @@ class EscoDs(UsefulPaths):
     def classify_occupations_gbn(self):
         pass
 
-    def occupation_metadata(self):
+    def merged_occupation_metadata(self):
         """
 
         Returns
@@ -850,7 +850,7 @@ class EscoDs(UsefulPaths):
         isco08_digits=[1, 2, 3, 4],
         use_weights=False,
     ):
-        occ = self.occupation_metadata().copy()
+        occ = self.merged_occupation_metadata().copy()
         occ["n_occ_esco"] = np.ones(len(occ))
 
         # one csv per isco level
@@ -941,5 +941,5 @@ if __name__ == "__main__":
     # esco.occupation_skills_matrix()
     # esco.occupation_similarity_matrix()
     esco.skills_metadata()
-    # esco.merge_occupation_metadata()
+    # esco.merged_occupation_metadata()
     # esco.aggregate_occ_data_by_isco()

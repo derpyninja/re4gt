@@ -76,7 +76,7 @@ class EulfsVis(EulfsDs):
         ]
 
     # todo: potentially move to new class in features submodule
-    def aggregate_by_region(self, epsg="3035"):
+    def aggregate_by_region(self, industry=None, epsg="3035"):
         """
         Aggregate variables by NUTS regions.
 
@@ -108,6 +108,11 @@ class EulfsVis(EulfsDs):
         data_panel = self.data_panel[
             self.data_panel["COUNTRYW"].isin(self.countries_for_maps)
         ]
+
+        # optional: subset by industries
+        if industry is not None:
+            industry_mask = data_panel.loc[:, "NACE1D_label"] == industry
+            data_panel = data_panel.loc[industry_mask]
 
         # aggregate over regions
         df_all_agg = (
@@ -194,6 +199,7 @@ class EulfsVis(EulfsDs):
 
     def create_maps(
         self,
+        slice_by_industry=False,
         figsize=(10, 10),
         legend=True,
         vmin=0,
@@ -204,6 +210,7 @@ class EulfsVis(EulfsDs):
 
         Parameters
         ----------
+        slice_by_industry
         figsize
         legend
         vmin
@@ -217,17 +224,58 @@ class EulfsVis(EulfsDs):
         logger = logging.getLogger(__name__)
         logger.info("GBN employment shares by region.")
 
+        base_dir_name = "employment_shares_by_region"
+
         # read aggregated data
-        # todo: should be read from an existing file
-        gdf_sub = self.aggregate_by_region()
+        if not slice_by_industry:
+            # todo: should be read from an existing file
+            gdf_sub = self.aggregate_by_region()
 
-        # select cols that should be plotted
-        # todo: fix hardcoded retrieval of column name identifiers
-        cols_to_plot = gdf_sub.columns[
-            gdf_sub.columns.str.startswith("COEFF_")
-            & gdf_sub.columns.str.endswith("relative")
-        ].to_list()
+            # select cols that should be plotted
+            # todo: fix hardcoded retrieval of column name identifiers
+            cols_to_plot = gdf_sub.columns[
+                gdf_sub.columns.str.startswith("COEFF_")
+                & gdf_sub.columns.str.endswith("relative")
+            ].to_list()
 
+            dir_name = base_dir_name
+            self.plot_map(
+                gdf_sub, cols_to_plot, dir_name, figsize, cbar_label, legend, vmin
+            )
+        else:
+            industry_labels = self.df_nace.loc[:, "NACE1D_label"]
+            for i, industry in enumerate(industry_labels):
+                print(industry)
+                dir_name = os.path.join(base_dir_name, "{}_{}".format(i, industry))
+
+                # subset by industry before aggregating by region
+                gdf_sub = self.aggregate_by_region(industry=industry)
+
+                # select cols that should be plotted
+                # todo: fix hardcoded retrieval of column name identifiers
+                cols_to_plot = gdf_sub.columns[
+                    gdf_sub.columns.str.startswith("COEFF_")
+                    & gdf_sub.columns.str.endswith("relative")
+                ].to_list()
+
+                self.plot_map(
+                    gdf_sub, cols_to_plot, dir_name, figsize, cbar_label, legend, vmin,
+                    additional_title_info=industry
+                )
+        return None
+
+    def plot_map(
+        self,
+        gdf_sub,
+        cols_to_plot,
+        dir_name,
+        figsize,
+        cbar_label,
+        legend,
+        vmin,
+        max_folder_name_length=50,
+        additional_title_info=None,
+    ):
         # parse plotting params
         legend_kwds = {"label": cbar_label, "fraction": 0.03, "extend": "max"}
         p_low, p_high = self.robust_cmap_percentiles
@@ -265,7 +313,10 @@ class EulfsVis(EulfsDs):
             )
 
             # labelling
-            ax.set_title("{} ({})".format(column, self.year))
+            title_snippet = (
+                additional_title_info if additional_title_info is not None else ""
+            )
+            ax.set_title("{} ({}) \n {}".format(column, self.year, title_snippet))
             ax.set_xlim(xmin, xmax)
             ax.set_ylim(ymin, ymax)
 
@@ -274,23 +325,31 @@ class EulfsVis(EulfsDs):
             plt.tight_layout()
 
             # save
-            out_dir = os.path.join(
+            if len(dir_name) >= max_folder_name_length:
+                dir_name = dir_name[:max_folder_name_length]
+
+            fpath_out_dir = os.path.join(
                 self.figure_dir,
                 "03_eulfs",
                 str(self.year),
-                "employment_shares_by_region",
+                dir_name,
             )
-            utils.ccdir(out_dir)
+            utils.ccdir(fpath_out_dir)
+            print(fpath_out_dir)
 
-            plt.savefig(
-                os.path.join(out_dir, "{}.png".format(column)),
-                dpi=150,
-                bbox_inches="tight",
-            )
+            try:
+                plt.savefig(
+                    os.path.join(fpath_out_dir, "{}.png".format(column)),
+                    dpi=150,
+                    bbox_inches="tight",
+                )
+            except FileNotFoundError as e:
+                print(e)
+                continue
 
+            plt.cla()
             plt.close(fig)
-
-        return None
+        plt.close()
 
     def create_industry_barplots(self):
         logger = logging.getLogger(__name__)
@@ -539,7 +598,7 @@ if __name__ == "__main__":
         year=2019,
     )
 
-    eulfs_visualiser.create_maps()
+    eulfs_visualiser.create_maps(slice_by_industry=True)
     # eulfs_visualiser.create_occupation_barplots(n_occ="all")
     # eulfs_visualiser.create_occupation_barplots(n_occ=10)
     # eulfs_visualiser.create_occupation_barplots(n_occ=20)

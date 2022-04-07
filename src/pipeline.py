@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # esco.occupation_skills_matrix()
     # esco.occupation_similarity_matrix()
     # esco.skills_metadata()
-    # esco.merge_occupation_metadata()
+    # esco.merged_occupation_metadata()
     # esco.aggregate_occ_data_by_isco()
     #
     # # EU-LFS
