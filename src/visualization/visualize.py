@@ -259,8 +259,14 @@ class EulfsVis(EulfsDs):
                 ].to_list()
 
                 self.plot_map(
-                    gdf_sub, cols_to_plot, dir_name, figsize, cbar_label, legend, vmin,
-                    additional_title_info=industry
+                    gdf_sub,
+                    cols_to_plot,
+                    dir_name,
+                    figsize,
+                    cbar_label,
+                    legend,
+                    vmin,
+                    additional_title_info=industry,
                 )
         return None
 
