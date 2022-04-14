@@ -145,7 +145,7 @@ class EulfsDs(LmData, EscoDs):
         self.nace_colname = "NACE{}D".format(self.n_digits_nace)
 
         # read occupation metadata
-        self.occupation_metadata = self.merged_occupation_metadata()
+        self.occupation_metadata = self.combine_occupation_metadata()
 
         self.occupation_metadata_agg = self.aggregate_occ_data_by_isco()
         # self.occupation_metadata_agg_subset = self.occupation_metadata_agg[

@@ -24,209 +24,360 @@ class EscoDs(UsefulPaths):
         # inherit class storing useful paths
         UsefulPaths.__init__(self=self, fn_config_path=fn_config_path)
 
+        # -----------------------------------------------------------------------------
         # parse config file
+        # -----------------------------------------------------------------------------
         self.config_data = utils.load_config(
             os.path.join(self.config_dir, fn_config_data)
         )
 
-        # language and versions
+        # extract language and versions
         self.esco_language = self.config_data["ESCO"]["LANGUAGE"]  # "en"
         self.esco_version = self.config_data["ESCO"]["VERSION"]  # "v1.0.3" or "v1.1.0"
         self.esco_version_newest = self.config_data["ESCO"]["VERSION_NEWEST"]
         self.esco_skills_hierarchy_version = (
             "v1.0.8" if self.esco_version == "v1.0.3" else "v1.1.0"
         )
-
-        # additional static parameters
+        # -----------------------------------------------------------------------------
+        # static parameters for GBN skill and occupation classifications
+        # -----------------------------------------------------------------------------
         self.skill_types_gbn = ["green", "brown", "neutral"]
-        self.skill_col_fmt = "skill_{}"
+        self.skill_clsf_ds = ["esco", "eth"]
+        self.skill_col_fmt = "skill_{type}_{ds}"
+
         # note: formatting string below needs to start with "share"
         self.gbn_share_fmt = "share_{type}_{ds}"
 
-        # column names of GBN skills in ESCO
-        self.green_id_colname = "skill_green"
-        self.brown_id_colname = "skill_brown"
-        self.neutral_id_colname = "skill_neutral"
+        # column names of unvalidated GBN skills in ESCO
+        self.green_id_colname_esco = "skill_green_esco"
+        self.brown_id_colname_esco = "skill_brown_esco"
+        self.neutral_id_colname_esco = "skill_neutral_esco"
 
-        # column names of GBN skills in O*NET
+        # column names of ETH-validated GBN skills in ESCO
+        self.green_id_colname_eth = "skill_green_eth"
+        self.brown_id_colname_eth = "skill_brown_eth"
+        self.neutral_id_colname_eth = "skill_neutral_eth"
+
+        # column names of merged classification columns
+        self.skills_clsf_colname_esco = "skill_classification_esco"
+        self.skills_clsf_colname_eth = "skill_classification_eth"
+
+        # column names of GBN occupations in O*NET
         self.green_id_onet = "is_green_onet"
         self.brown_id_onet = "is_brown_onet"
         self.neutral_id_onet = "is_neutral_onet"
-
+        # -----------------------------------------------------------------------------
         # functions for the aggregation of occupation data
+        # -----------------------------------------------------------------------------
         # TODO: add agg func for discrete GBN classifications
         self.agg_func_dict = {
             "mean": np.nanmean,
-            "std": np.nanstd,
-            "median": np.nanmedian,
-            "iqr": stats_utils.naniqr,
+            # "std": np.nanstd,
+            # "median": np.nanmedian,
+            # "iqr": stats_utils.naniqr,
         }
-
-        # initialise containers
+        # -----------------------------------------------------------------------------
+        # initialise class variables, to be assigned later
+        # -----------------------------------------------------------------------------
         self.osm = None
         self.osim = None
-        self.data = None
 
-        # read data
-        self.data = self._read()
+        # ESCO Core Data
+        self._occupations = None
+        self._occupations_to_skills = None
+        self._skills = None
+        self._skills_v103 = None
+        self._skills_green = None
+        self._skills_brown = None
+        self._skills_hierarchy = None
+        self._skills_groups = None
 
-        # crosswalk to onet
-        self.onet_esco_crosswalk = self._read_crosswalk_to_onet()
+        # Mapping Career Causeways
+        self._skills_hierarchy_mcc = None
+        self._skills_coreness_mcc = None
+        self._job_zones_mcc = None
+        self._covid_exposure_mcc = None
 
-    def _read_crosswalk_to_onet(self):
-        return pd.read_csv(self.path_crosswalk_onet_esco)
+        # MCC crosswalks to onet
+        self._crosswalk_onet_esco_mcc_full = None
+        self._crosswalk_onet_esco_mcc_reduced = None
 
-    def _read(self):
+        # ONET-specific data
+        self._green_occupations_onet = None
+        self._brown_occupations_onet = None
+
+        # merged data
+        self.skills_metadata = None
+        self.occupation_metadata = None
+
+    @property
+    def occupations(self):
         """
-        Read main ESCO pillars (occupations, skills, occupation-skills mapping)
-        and skills hierarchy.
+        ESCO occupations pillar.
 
         Returns
         -------
-        self.esco_data : dict
-            Dictionary containing pd.DataFrame's of the relevant ESCO pillars and
-            metadata.
+
         """
-
-        # -----------------------------------------------------------------------------
-        # core
-        # -----------------------------------------------------------------------------
-        occ = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_version,
-                "occupations_{}.csv".format(self.esco_language),
+        if self._occupations is None:
+            self._occupations = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    self.esco_version,
+                    "occupations_{}.csv".format(self.esco_language),
+                )
             )
-        )
-        skills = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_version,
-                "skills_{}.csv".format(self.esco_language),
-            )
-        )
-        occ_skills_mapping = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_version,
-                "occupationSkillRelations.csv",
-            )
-        )
+        return self._occupations
 
-        # -----------------------------------------------------------------------------
-        # additional (ESCO)
-        # -----------------------------------------------------------------------------
-        # ESCO green skill labels
-        green_skills = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_version_newest,
-                "greenSkillsCollection_{}.csv".format(self.esco_language),
+    @property
+    def skills(self):
+        """
+        ESCO skills, knowledge & competences pillar.
+
+        Returns
+        -------
+
+        """
+        if self._skills is None:
+            self._skills = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    self.esco_version,
+                    "skills_{}.csv".format(self.esco_language),
+                )
             )
-        )
-        green_skills[self.green_id_colname] = True
+        return self._skills
 
-        # ESCO brown skill labels
-        brown_skills = pd.read_excel(
-            os.path.join(
-                self.data_external,
-                "esco",
-                self.esco_version_newest,
-                "BrownSkillsKnowledge.xlsx",
+    @property
+    def skills_v103(self):
+        """
+        ESCO skills, knowledge & competences pillar from v.1.0.3. Needed for joining
+        skills coreness data from MCC project.
+
+        Returns
+        -------
+
+        """
+        if self._skills_v103 is None:
+            self._skills_v103 = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    "v1.0.3",
+                    "skills_{}.csv".format(self.esco_language),
+                )
             )
-        )
-        brown_skills[self.brown_id_colname] = True
+        return self._skills_v103
 
-        # ESCO skills hierarchies
-        skills_hierarchy = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_skills_hierarchy_version,
-                "skillsHierarchy_{}.csv".format(self.esco_language),
+    @property
+    def occupations_to_skills(self):
+        """
+        Mapping between ESCO occupations and skills.
+
+        Returns
+        -------
+
+        """
+        if self._occupations_to_skills is None:
+            self._occupations_to_skills = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    self.esco_version,
+                    "occupationSkillRelations.csv",
+                )
             )
-        )
+        return self._occupations_to_skills
 
-        skills_hierarchy_kanders = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "mapping-career-causeways",
-                "codebase",
-                "data",
-                "processed",
-                "ESCO_skills_hierarchy",
-                "ESCO_skills_hierarchy.csv",
+    @property
+    def skills_green(self):
+        """
+        ESCO green skill labels
+
+        Returns
+        -------
+
+        """
+        if self._skills_green is None:
+            self._skills_green = pd.read_excel(
+                os.path.join(
+                    self.data_external,
+                    "esco",
+                    self.esco_version_newest,
+                    "GreenBrownSkillsValidationETH.xlsx",
+                ),
+                sheet_name="greenSkillsCollection_en",
             )
-        )
+        return self._skills_green
 
-        # ESCO skill groups
-        skill_groups = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "esco",
-                self.esco_version,
-                "skillGroups_{}.csv".format(self.esco_language),
+    @property
+    def skills_brown(self):
+        """
+        ESCO brown skill labels
+
+        Returns
+        -------
+
+        """
+        if self._skills_brown is None:
+            self._skills_brown = pd.read_excel(
+                os.path.join(
+                    self.data_external,
+                    "esco",
+                    self.esco_version_newest,
+                    "GreenBrownSkillsValidationETH.xlsx",
+                ),
+                sheet_name="brownSkillsCollection_en",
             )
-        )
+        return self._skills_brown
 
-        # -----------------------------------------------------------------------------
-        # additional (Nesta)
-        # -----------------------------------------------------------------------------
+    @property
+    def skills_hierarchy(self):
+        """
+        ESCO skills hierarchy
 
-        # coreness values
-        skills_coreness = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "mapping-career-causeways",
-                "codebase",
-                "data",
-                "interim",
-                "upskilling_analysis",
-                "skills_coreness_measure.csv",
+        Returns
+        -------
+
+        """
+        if self._skills_hierarchy is None:
+            self._skills_hierarchy = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    self.esco_skills_hierarchy_version,
+                    "skillsHierarchy_{}.csv".format(self.esco_language),
+                )
             )
-        )
+        return self._skills_hierarchy
 
-        job_zones_onet = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "mapping-career-causeways",
-                "codebase",
-                "data",
-                "processed",
-                "linked_data",
-                "ESCO_occupations_Job_Zones.csv",
+    @property
+    def skills_groups(self):
+        if self._skills_groups is None:
+            self._skills_groups = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    self.esco_version,
+                    "skillGroups_{}.csv".format(self.esco_language),
+                )
             )
-        )
+        return self._skills_groups
 
-        covid_exposure = pd.read_csv(
-            os.path.join(
-                self.data_raw,
-                "mapping-career-causeways",
-                "codebase",
-                "data",
-                "processed",
-                "linked_data",
-                "ESCO_occupations_COVID_Exposure.csv",
+    @property
+    def skills_hierarchy_mcc(self):
+        if self._skills_hierarchy_mcc is None:
+            self._skills_hierarchy_mcc = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "mapping-career-causeways",
+                    "codebase",
+                    "data",
+                    "processed",
+                    "ESCO_skills_hierarchy",
+                    "ESCO_skills_hierarchy.csv",
+                )
             )
-        )
+        return self._skills_hierarchy_mcc
 
-        return {
-            "occ": occ,
-            "skills": skills,
-            "occ_skills_mapping": occ_skills_mapping,
-            "skills_green": green_skills,
-            "skills_brown": brown_skills,
-            "skills_coreness": skills_coreness,
-            "skills_hierarchy": skills_hierarchy,
-            "skills_hierarchy_kanders": skills_hierarchy_kanders,
-            "skill_groups": skill_groups,
-            "job_zones_onet": job_zones_onet,
-            "covid_exposure": covid_exposure,
-        }
+    @property
+    def skills_coreness_mcc(self):
+        """
+        Skills coreness for ESCO v.1.0.3. A composite measure for the centrality of a
+        skill in the overall ESCO skill network.
+
+        Returns
+        -------
+
+        """
+        if self._skills_coreness_mcc is None:
+            self._skills_coreness_mcc = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "mapping-career-causeways",
+                    "codebase",
+                    "data",
+                    "interim",
+                    "upskilling_analysis",
+                    "skills_coreness_measure.csv",
+                )
+            )
+        return self._skills_coreness_mcc
+
+    @property
+    def job_zones_mcc(self):
+        """
+        O*NET job zone mapped to ESCO v.1.0.3. Comprises a worker's education level,
+        related work experience and on-the-job training.
+
+        Returns
+        -------
+
+        """
+        if self._job_zones_mcc is None:
+            self._job_zones_mcc = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "mapping-career-causeways",
+                    "codebase",
+                    "data",
+                    "processed",
+                    "linked_data",
+                    "ESCO_occupations_Job_Zones.csv",
+                )
+            )
+        return self._job_zones_mcc
+
+    @property
+    def covid_exposure_mcc(self):
+        if self._covid_exposure_mcc is None:
+            self._covid_exposure_mcc = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "mapping-career-causeways",
+                    "codebase",
+                    "data",
+                    "processed",
+                    "linked_data",
+                    "ESCO_occupations_COVID_Exposure.csv",
+                )
+            )
+        return self._covid_exposure_mcc
+
+    @property
+    def crosswalk_onet_esco_mcc_full(self):
+        """
+        ONET-ESCO crosswalk for the full set of ESCO v.1.0.3 occupations (n=2941).
+
+        Returns
+        -------
+
+        """
+        if self._crosswalk_onet_esco_mcc_full is None:
+            self._crosswalk_onet_esco_mcc_full = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "mapping-career-causeways",
+                    "codebase",
+                    "data",
+                    "processed",
+                    "ESCO_ONET_xwalk_full.csv",
+                )
+            )
+        return self._crosswalk_onet_esco_mcc_full
+
+    @property
+    def crosswalk_onet_esco_mcc_reduced(self):
+        pass
+
+    """
+
+    # ONET-specific data
+    self._green_occupations_onet = None
+    self._brown_occupations_onet = None
+    """
 
     def _calc_osm_variants(self, occ_skills_matrix_eo):
         """
@@ -291,17 +442,17 @@ class EscoDs(UsefulPaths):
             errors = 0
             skill_vectors = []
 
-            for i in tqdm(range(len(self.data["occ"]))):
-                occ_uri = self.data["occ"].iloc[i, :][1]
+            for i in tqdm(range(len(self.occupations))):
+                occ_uri = self.occupations.iloc[i, :][1]
 
                 # lookup corresponding skills
-                skill_list = self.data["occ_skills_mapping"][
-                    self.data["occ_skills_mapping"]["occupationUri"] == occ_uri
+                skill_list = self.occupations_to_skills[
+                    self.occupations_to_skills["occupationUri"] == occ_uri
                 ]
 
                 # create vector
                 skill_vector = []
-                for j, skill in enumerate(self.data["skills"].conceptUri.values):
+                for j, skill in enumerate(self.skills.conceptUri.values):
 
                     if skill in skill_list.skillUri.values:
                         relation_type = skill_list.loc[
@@ -335,8 +486,8 @@ class EscoDs(UsefulPaths):
 
             # create df
             occ_skills_matrix_eo = pd.DataFrame(
-                index=self.data["occ"].conceptUri,
-                columns=self.data["skills"].conceptUri,
+                index=self.occupations.conceptUri,
+                columns=self.skills.conceptUri,
                 data=np.array(skill_vectors),
             )
 
@@ -392,8 +543,8 @@ class EscoDs(UsefulPaths):
 
                 # to df
                 df_occ_sim_matrix_weighted_coo = pd.DataFrame(
-                    index=self.data["occ"].conceptUri,
-                    columns=self.data["occ"].conceptUri,
+                    index=self.occupations.conceptUri,
+                    columns=self.occupations.conceptUri,
                     data=occ_sim_matrix_coo,
                 )
 
@@ -405,12 +556,11 @@ class EscoDs(UsefulPaths):
 
         return osim_dict
 
-    def skills_metadata(self):
+    def combine_skills_metadata(self, export=True, fpath_out=None):
         """
-        Calculate and merge relevant metadata to the ESCO skills pillar (greenness,
-        coreness).
+        Combine all skill-level metadata (SMD).
 
-        Evaluation
+        Evaluation comments
             - ESCO v.1.1.0 comprises 13891 skills compared to v.1.0.3 with 13485 skills.
             - Hence, overall 406 new skills in v.1.1.0 compared to v.1.0.3.
             - 570 skills labelled as green in v.1.1.0, some of which are presumably new,
@@ -421,14 +571,10 @@ class EscoDs(UsefulPaths):
 
         Returns
         -------
-        skills_metadata : pd.DataFrame
+        smd : pd.DataFrame
             DataFrame containing the raw ESCO skills pillar data enriched by additional
             metadata (green labels, coreness).
         """
-        logger = logging.getLogger(__name__)
-        logger.info(
-            "Calculating & merging ESCO occupation metadata (green labels, coreness)."
-        )
 
         # output fpath
         target_path = os.path.join(
@@ -438,125 +584,102 @@ class EscoDs(UsefulPaths):
             "skills_metadata_{}.csv".format(self.esco_language),
         )
 
-        if not os.path.exists(target_path):
+        if self.skills_metadata is None:
             # -------------------------------------------------------------------------
             # Green Skills
             # -------------------------------------------------------------------------
-            # TODO: refactor to static function
-            # Find cols that are unique in green skills file compared to general
-            # skills file: "The difference between A and B contains all elements that
-            # are in A but not in B."
-            # Source: https://www.kaggle.com/ashukr/sets-and-venn-diagram-in-python
-            set_diff = list(
-                set(self.data["skills_green"].columns.values.tolist())
-                - set(self.data["skills"].columns.values.tolist())
-            )
-            set_diff.insert(0, "conceptUri")
+            set_diff = utils.get_set_diff(self.skills_green, self.skills, "conceptUri")
 
-            # copy skills df and join information on green skills
-            skills_metadata = self.data["skills"].copy()
-            skills_metadata = skills_metadata.merge(
-                right=self.data["skills_green"][set_diff],
+            # copy skills df and join green skills information
+            smd = self.skills.copy()
+            smd = smd.merge(
+                right=self.skills_green[set_diff],
                 on="conceptUri",
                 how="left",
+                suffixes=["", "_green"],
                 validate="one_to_one",
             )
-            skills_metadata = skills_metadata.fillna(
-                value={self.green_id_colname: False}
-            )
+
+            # TODO: add eth colnames once skills are fully classified
+            smd = smd.fillna(value={self.green_id_colname_esco: False})
 
             # -------------------------------------------------------------------------
             # Brown Skills
             # -------------------------------------------------------------------------
-            # TODO: refactor to static function
-            set_diff = list(
-                set(self.data["skills_brown"].columns.values.tolist())
-                - set(self.data["skills"].columns.values.tolist())
-            )
-            set_diff.insert(0, "conceptUri")
+            set_diff = utils.get_set_diff(self.skills_brown, self.skills, "conceptUri")
 
-            skills_metadata = skills_metadata.merge(
-                right=self.data["skills_brown"][set_diff],
+            smd = smd.merge(
+                right=self.skills_brown[set_diff],
                 on="conceptUri",
                 how="left",
                 validate="one_to_one",
+                suffixes=["", "_brown"],
             )
-            skills_metadata = skills_metadata.fillna(
-                value={self.brown_id_colname: False}
-            )
+
+            # TODO: add eth column names once skills are fully classified
+            smd = smd.fillna(value={self.brown_id_colname_esco: False})
 
             # -------------------------------------------------------------------------
             # Derive Neutral Skills
             # -------------------------------------------------------------------------
-            # TODO: refactor to class function
-            skills_metadata[self.neutral_id_colname] = (
-                skills_metadata[self.green_id_colname] == False
-            ) & (skills_metadata[self.brown_id_colname] == False)
-
-            # sanity check
-            ambiguous_cases = (skills_metadata[self.brown_id_colname] == True) & (
-                skills_metadata[self.green_id_colname] == True
+            smd = classify_by_gbn(
+                df=smd,
+                col_name_green=self.green_id_colname_esco,
+                col_name_brown=self.brown_id_colname_esco,
+                col_name_neutral=self.neutral_id_colname_esco,
+                col_name_clfc=self.skills_clsf_colname_esco,
             )
-            assert ambiguous_cases.sum() == 0
 
-            # create skill classification column: green/brown/neutral
-            skills_metadata["skillClassification"] = skills_metadata[
-                [self.green_id_colname, self.brown_id_colname, self.neutral_id_colname]
-            ].idxmax(axis=1)
-
-            skills_metadata["skillClassification"] = (
-                skills_metadata["skillClassification"]
-                .str.split(pat="_", expand=True)
-                .iloc[:, 1]
-            )
+            # TODO: repeat for eth data once skills are fully classified
+            # classify_neutral_skills(
+            #     df=smd,
+            #     col_name_green=self.green_id_colname_eth,
+            #     col_name_brown=self.brown_id_colname_eth,
+            #     col_name_neutral=self.neutral_id_colname_eth,
+            #     col_name_clfc=self.skills_clsf_colname_eth
+            # )
 
             # -------------------------------------------------------------------------
             # Coreness Metric
             # -------------------------------------------------------------------------
             # append conceptUri of ESCO v1.0.3 skills
-            skills_v103 = pd.read_csv(
-                os.path.join(
-                    self.data_raw,
-                    "esco",
-                    "v1.0.3",
-                    "skills_{}.csv".format(self.config_data["ESCO"]["LANGUAGE"]),
-                )
-            )
             keep_cols = ["conceptUri", "preferredLabel"]
-            skills_coreness_with_uri = self.data["skills_coreness"].merge(
-                right=skills_v103[keep_cols],
+            skills_coreness_with_uri = self.skills_coreness_mcc.merge(
+                right=self.skills_v103[keep_cols],
                 left_on="preferred_label",
                 right_on="preferredLabel",
                 how="left",
                 validate="one_to_one",
             )
 
-            # Merge Green Labels and Coreness to Skills Pillar
+            # Merge Coreness to Skills Pillar
             keep_cols = ["conceptUri", "coreness"]
-            skills_metadata = skills_metadata.merge(
+            smd = smd.merge(
                 right=skills_coreness_with_uri[keep_cols],
                 on="conceptUri",
                 how="left",
                 validate="one_to_one",
             )
 
-            # note: this dataset refers to variable "greenskill"
-            #  in the FDZ Verfahrensbeschreibung
-            # save
-            self.data["skills_metadata"] = skills_metadata
-            skills_metadata.to_csv(target_path)
+            # optionally save for inspection
+            if export:
+                if fpath_out is None:
+                    fpath_out = target_path
+                smd.to_csv(fpath_out, sep=";")
 
-        else:
-            skills_metadata = pd.read_csv(target_path, index_col=0)
-            self.data["skills_metadata"] = skills_metadata
-        return skills_metadata
+            # assign
+            self.skills_metadata = smd
+
+        return smd
 
     # todo: implement weighted form of esco-based greenness measure
     def calc_gbn_shares_skill_based(self, weighted=False):
         # read
         osm = self.occupation_skills_matrix()
         occ_skills_matrix_unweighted = osm["osm_unweighted"]
-        self.skills_metadata()
+
+        if self.skills_metadata is None:
+            self.combine_skills_metadata()
 
         # number of occupation-specific skills
         n_total_specific_skills = occ_skills_matrix_unweighted.sum(axis=1).values
@@ -567,27 +690,31 @@ class EscoDs(UsefulPaths):
 
         # calc occupational shares for each skill type
         colnames = []
-        for skill_type in self.skill_types_gbn:
-            col = self.skill_col_fmt.format(skill_type)
-            colname_shares = self.gbn_share_fmt.format(type=skill_type, ds="esco")
 
-            # number of occupation-specific green/brown/neutral skills
-            specific_skills = (
-                occ_skills_matrix_unweighted.values
-                * self.data["skills_metadata"][col].astype(np.int8).values
-            )
+        # TODO: remove [:1] once ETH skill classification is finished
+        for ds in self.skill_clsf_ds[:1]:
+            for skill_type in self.skill_types_gbn:
+                col = self.skill_col_fmt.format(type=skill_type, ds=ds)
+                colname_shares = self.gbn_share_fmt.format(type=skill_type, ds=ds)
 
-            n_partial_specific_skills = specific_skills.sum(axis=1)
+                # number of occupation-specific green/brown/neutral skills
+                specific_skills = (
+                    occ_skills_matrix_unweighted.values
+                    * self.skills_metadata[col].astype(np.int8).values
+                )
 
-            # occupational share
-            occ_share = n_partial_specific_skills / n_total_specific_skills
+                n_gbn_specific_skills = specific_skills.sum(axis=1)
 
-            # append to dict
-            data_out[
-                "n_{}_specific_skills".format(skill_type)
-            ] = n_partial_specific_skills
-            data_out[colname_shares] = occ_share
-            colnames.append(colname_shares)
+                # occupational share
+                occ_share = n_gbn_specific_skills / n_total_specific_skills
+
+                # append to dict
+                data_out[
+                    "n_{type}_specific_skills_{ds}".format(type=skill_type, ds=ds)
+                ] = n_gbn_specific_skills
+
+                data_out[colname_shares] = occ_share
+                colnames.append(colname_shares)
 
         df_occ_shares_per_skill_type = pd.DataFrame(
             index=occ_skills_matrix_unweighted.index, data=data_out
@@ -598,7 +725,6 @@ class EscoDs(UsefulPaths):
 
         # classify into discrete GBN categories
         # TODO: check if only one True per col.
-        # TODO: rename to green/brown/neutral.
         df_occ_shares_per_skill_type[
             "gbn_classification_esco"
         ] = df_occ_shares_per_skill_type[colnames].idxmax(axis=1)
@@ -643,15 +769,19 @@ class EscoDs(UsefulPaths):
         # merge to ESCO occupations pillar via crosswalk
         greenness_onet_esco = greenness_onet.copy()
         greenness_onet_esco = greenness_onet_esco.merge(
-            right=self.onet_esco_crosswalk,
+            right=self.crosswalk_onet_esco_mcc_full,
             on="onet_code",
             how="left",
             validate="1:m",
         )
 
+        # downcast dtypes
+        greenness_onet_esco = utils.downcast_df(greenness_onet_esco)
+
         # save
         greenness_onet.to_csv(
-            os.path.join(self.data_interim, "onet", "task_based_greenness_onet.csv")
+            os.path.join(self.data_interim, "onet", "task_based_greenness_onet.csv"),
+            sep=";",
         )
 
         greenness_onet_esco.to_csv(
@@ -661,12 +791,20 @@ class EscoDs(UsefulPaths):
                 "task_based_greenness_onet_esco_{}.csv".format(
                     self.esco_version.replace(".", "")
                 ),
-            )
+            ),
+            sep=";",
         )
 
         return greenness_onet_esco
 
-    def _read_brown_occupations_vona2018(self):
+    def read_brown_occupations_vona2018(self):
+        """
+        Read Vona et al. 2019 brown occupation classification and merge to ESCO occupations via Nesta ONET-ESCO crosswalk.
+
+        Returns
+        -------
+
+        """
         brown_occs_vona2018 = pd.read_csv(
             os.path.join(
                 self.data_raw, "onet", "vona_2018", "brown_occupations_vona2018.csv"
@@ -676,19 +814,40 @@ class EscoDs(UsefulPaths):
         # pad to 8 digits
         brown_occs_vona2018["soc_code"] = brown_occs_vona2018["soc_code"] + ".00"
 
-        # add brown occupation classification
+        # add binary brown occupation classification
         brown_occs_vona2018[self.brown_id_onet] = np.ones(
             brown_occs_vona2018.shape[0], dtype=bool
         )
 
         # merge to ESCO occupations pillar via crosswalk
         brown_occs_vona2018_esco = brown_occs_vona2018.merge(
-            right=self.onet_esco_crosswalk,
+            right=self.crosswalk_onet_esco_mcc_full,
             left_on="soc_code",
             right_on="onet_code",
             how="left",
-            # validate="1:1",
-        )
+            # validate="m:1",
+        ).drop(columns=["soc_code", "occupation"], axis=1)
+
+        # drop duplicates & missing vals
+        dups = brown_occs_vona2018_esco.concept_uri.duplicated()
+        brown_occs_vona2018_esco = brown_occs_vona2018_esco.loc[~dups]
+
+        brown_occs_vona2018_esco.dropna(subset="concept_uri", inplace=True)
+
+        # downcast dtype
+        brown_occs_vona2018_esco = utils.downcast_df(brown_occs_vona2018_esco)
+
+        # rearrange
+        col_order = [
+            "id",
+            "concept_uri",
+            "preferred_label",
+            "isco_level_4",
+            "is_brown_onet",
+            "onet_code",
+            "onet_occupation",
+        ]
+        brown_occs_vona2018_esco = brown_occs_vona2018_esco[col_order]
 
         # save
         brown_occs_vona2018_esco.to_csv(
@@ -698,70 +857,50 @@ class EscoDs(UsefulPaths):
                 "brown_occupations_vona2018_esco_{}.csv".format(
                     self.esco_version.replace(".", "")
                 ),
-            )
+            ),
+            sep=";",
         )
 
         return brown_occs_vona2018_esco
 
-    # TODO: refactor code from other functions
-    def classify_occupations_gbn(self):
-        pass
+    def combine_occupation_metadata(self, export=True, fpath_out=None):
+        # target fpath
+        output_dir = os.path.join(self.data_interim, "esco", self.esco_version)
+        fname_no_ext = "occ_metadata_{}".format(self.esco_language)
 
-    def merged_occupation_metadata(self):
-        """
-
-        Returns
-        -------
-
-        """
-        target_fpath_csv = os.path.join(
-            self.data_interim,
-            "esco",
-            self.esco_version,
-            "occ_metadata_{}.csv".format(self.esco_language),
-        )
-
-        target_fpath_pkl = os.path.join(
-            self.data_interim,
-            "esco",
-            self.esco_version,
-            "occ_metadata_{}.pkl".format(self.esco_language),
-        )
-
-        if not os.path.exists(target_fpath_pkl):
+        if self.occupation_metadata is None:
             # init container
-            occ_metadata = self.data["occ"].copy()
+            omd = self.occupations.copy()
 
             # decompose isco 4-digit level
-            occ_metadata["isco_level_4"] = (
-                occ_metadata["iscoGroup"]
-                .astype(str)
-                .str.pad(width=4, side="left", fillchar="0")
+            omd["isco_level_4"] = (
+                omd["iscoGroup"].astype(str).str.pad(width=4, side="left", fillchar="0")
             )
             for lvl in [1, 2, 3]:
                 new_colname = "isco_level_{}".format(lvl)
-                occ_metadata[new_colname] = occ_metadata["isco_level_4"].str[0:lvl]
+                omd[new_colname] = omd["isco_level_4"].str[0:lvl]
 
             # merge onet codes and names via crosswalk
-            occ_metadata = occ_metadata.merge(
-                right=self.onet_esco_crosswalk,
-                left_on="conceptUri",
-                right_on="concept_uri",
-                how="left",
-                suffixes=["", "_y"],
-                validate="1:1",
-            )
+            # occ_metadata = occ_metadata.merge(
+            #     right=self.crosswalk_onet_esco_mcc_full,
+            #     left_on="conceptUri",
+            #     right_on="concept_uri",
+            #     how="left",
+            #     suffixes=["", "_y"],
+            #     validate="1:1",
+            # )
 
             # Read data sets
             df_gbn_shares_esco = self.calc_gbn_shares_skill_based()
             df_greenness_onet_esco = self.read_greenness_task_based()
-            df_brown_occs_vona2018_esco = self._read_brown_occupations_vona2018()
-            # TODO: join --> ONET job zone, COVID Exposure
+            df_brown_occs_vona2018_esco = self.read_brown_occupations_vona2018()
 
             # merge variables to occupation df
+            # -------------------------------------------------------------------------
+            # TODO: join --> ONET job zone, COVID Exposure
 
-            # ESCO-based
-            occ_metadata = occ_metadata.merge(
+            # join ESCO-based GBN shares
+            omd = omd.merge(
                 right=df_gbn_shares_esco,
                 on="conceptUri",
                 how="left",
@@ -769,80 +908,88 @@ class EscoDs(UsefulPaths):
                 validate="1:1",
             )
 
-            # O*NET-based
-            occ_metadata = occ_metadata.merge(
-                right=df_greenness_onet_esco,
+            # join O*NET-based G shares
+            omd = omd.merge(
+                right=df_greenness_onet_esco.dropna(subset="concept_uri"),
                 left_on="conceptUri",
                 right_on="concept_uri",
                 how="left",
                 suffixes=["", "_y"],
-                validate="1:m",
+                validate="1:1",
             )
 
-            occ_metadata = occ_metadata.merge(
+            # join O*Net based Brown occupations
+            omd = omd.merge(
                 right=df_brown_occs_vona2018_esco,
                 left_on="conceptUri",
                 right_on="concept_uri",
                 how="left",
                 suffixes=["", "_y"],
-                validate="1:m",
+                validate="1:1",
             )
 
-            # ONET-based G/B/N classification
+            # create ONET-based G/B/N classification
 
             # TODO: refactor to function
             # classify green  & neutral occupations (data from GTP covers more
             # occupations, therefore using those. correlation with Vona 2018
             # greenness scores ~ 1)
-            occ_metadata[self.green_id_onet] = (
-                occ_metadata[self.gbn_share_fmt.format(type="green", ds="gtp")] > 0
-            )
-            occ_metadata[self.brown_id_onet] = occ_metadata[self.brown_id_onet].fillna(
-                False
+            green_threshold = 0
+
+            omd[self.green_id_onet] = (
+                omd[self.gbn_share_fmt.format(type="green", ds="gtp")] > green_threshold
             )
 
-            occ_metadata[self.neutral_id_onet] = (
-                occ_metadata[self.green_id_onet] == False
-            ) & (occ_metadata[self.brown_id_onet] == False)
+            omd[self.brown_id_onet] = omd[self.brown_id_onet].fillna(False)
+
+            omd[self.neutral_id_onet] = (omd[self.green_id_onet] == False) & (
+                omd[self.brown_id_onet] == False
+            )
 
             # there are 30 occupations that have been matched to both brown and green
-            query_ambiguous_cases = (occ_metadata[self.brown_id_onet] == True) & (
-                occ_metadata[self.green_id_onet] == True
+            query_ambiguous_cases = (omd[self.brown_id_onet] == True) & (
+                omd[self.green_id_onet] == True
             )
 
             # define ambiguous cases as brown (see thesis)
-            occ_metadata.loc[query_ambiguous_cases, self.green_id_onet] = False
+            omd.loc[query_ambiguous_cases, self.green_id_onet] = False
             # occ_metadata = occ_metadata.reset_index(drop=True)
 
             # create single classification column
             # TODO: assert check if only one True per col.
-            occ_metadata["gbn_classification_onet"] = occ_metadata[
+            omd["gbn_classification_onet"] = omd[
                 [self.brown_id_onet, self.green_id_onet, self.neutral_id_onet]
             ].idxmax(axis=1)
 
             # rename to green/brown/neutral.
-            occ_metadata["gbn_classification_onet"] = (
-                occ_metadata["gbn_classification_onet"]
+            omd["gbn_classification_onet"] = (
+                omd["gbn_classification_onet"]
                 .str.split(pat="_", expand=True)
                 .iloc[:, 1]
             )
 
             # filter out duplicate columns
-            occ_metadata = occ_metadata.drop(
-                occ_metadata.filter(regex="_y$").columns.tolist(), axis=1
-            )
+            omd = omd.drop(omd.filter(regex="_y$").columns.tolist(), axis=1)
 
             # check if all occs are classified
-            assert occ_metadata["gbn_classification_onet"].isna().sum() == 0
+            assert omd["gbn_classification_onet"].isna().sum() == 0
 
-            # note: comment line below for testing
-            self.data["occ_metadata"] = occ_metadata
-            occ_metadata.to_csv(target_fpath_csv)
-            occ_metadata.to_pickle(target_fpath_pkl)
-        else:
-            occ_metadata = pd.read_pickle(target_fpath_pkl)
-            self.data["occ_metadata"] = occ_metadata
-        return occ_metadata
+            # make sure there are no duplicates
+            assert omd.conceptUri.duplicated().sum() == 0
+
+        # update class variable
+        self.occupation_metadata = omd
+
+        # optional: save for inspection
+        if export:
+            if fpath_out is None:
+                utils.save_df_to_files(
+                    omd, output_dir=output_dir, fname_no_ext=fname_no_ext, sep=";"
+                )
+            else:
+                omd.to_csv(fpath_out, sep=";")
+
+        return omd
 
     # todo (minor): add COVID and automation-related data to agg process
     def aggregate_occ_data_by_isco(
@@ -850,8 +997,9 @@ class EscoDs(UsefulPaths):
         isco08_digits=[1, 2, 3, 4],
         use_weights=False,
     ):
-        occ = self.merged_occupation_metadata().copy()
-        occ["n_occ_esco"] = np.ones(len(occ))
+        if self.occupation_metadata is None:
+            self.combine_occupation_metadata()
+        self.occupation_metadata["n_occ_esco"] = np.ones(len(self.occupation_metadata))
 
         # one csv per isco level
         target_fpath_csv = os.path.join(
@@ -888,7 +1036,7 @@ class EscoDs(UsefulPaths):
 
             # aggregate
             if not use_weights:
-                occ_grouped = occ.groupby(group_var).agg(agg_dict)
+                occ_grouped = self.occupation_metadata.groupby(group_var).agg(agg_dict)
             else:
                 raise NotImplementedError("TODO: implement weighted aggregation")
 
@@ -917,12 +1065,38 @@ class EscoDs(UsefulPaths):
 
         df_out.to_csv(target_fpath_csv)
         df_out.to_pickle(target_fpath_pkl)
+
         # if not os.path.exists(target_fpath_pkl):
         #     pd.to_pickle(obj=df_out, filepath_or_buffer=target_fpath_pkl)
         # else:
         #     df_out = pd.read_pickle(target_fpath_pkl)
 
         return df_out
+
+
+def classify_by_gbn(
+    df,
+    col_name_green,
+    col_name_brown,
+    col_name_neutral,
+    col_name_clfc="skillClassification",
+):
+
+    df[col_name_neutral] = (df[col_name_green] == False) & (df[col_name_brown] == False)
+    # sanity check
+    ambiguous_cases = (df[col_name_brown] == True) & (df[col_name_green] == True)
+    assert ambiguous_cases.sum() == 0
+
+    if col_name_clfc is not None:
+        # create skill classification column: green/brown/neutral
+        gbn_classification = df[
+            [col_name_green, col_name_brown, col_name_neutral]
+        ].idxmax(axis=1)
+
+        df[col_name_clfc] = gbn_classification.str.split(pat="_", expand=True).iloc[
+            :, 1
+        ]
+    return df
 
 
 if __name__ == "__main__":
@@ -940,6 +1114,7 @@ if __name__ == "__main__":
 
     # esco.occupation_skills_matrix()
     # esco.occupation_similarity_matrix()
-    esco.skills_metadata()
-    # esco.merged_occupation_metadata()
+    esco.combine_skills_metadata()
+    # esco.read_greenness_task_based()
+    esco.combine_occupation_metadata()
     # esco.aggregate_occ_data_by_isco()

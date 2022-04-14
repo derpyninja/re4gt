@@ -1,5 +1,6 @@
 import os
 import yaml
+import pandas as pd
 from pathlib import Path
 from pprint import pprint
 
@@ -30,6 +31,7 @@ class UsefulPaths:
         self.data_processed = os.path.join(self.project_dir, "data", "processed")
         self.data_external = os.path.join(self.project_dir, "data", "external")
         self.notebook_dir = os.path.join(self.project_dir, "notebooks")
+        self.results_dir = os.path.join(self.project_dir, "results")
         self.figure_dir = os.path.join(self.project_dir, "results", "figures")
         self.table_dir = os.path.join(self.project_dir, "results", "tables")
         self.report_dir = os.path.join(self.project_dir, "results", "reports")
@@ -75,6 +77,37 @@ def load_config(config_filepath):
     return config_file
 
 
+def get_set_diff(df_left, df_right, merge_col=None):
+    """
+    Find cols that are unique in green skills file compared to general
+    skills file: "The difference between A and B contains all elements that
+    are in A but not in B."
+    Source: https://www.kaggle.com/ashukr/sets-and-venn-diagram-in-python
+
+    Parameters
+    ----------
+    df_left
+    df_right
+
+    Returns
+    -------
+
+    """
+    set_diff = list(
+        set(df_left.columns.values.tolist()) - set(df_right.columns.values.tolist())
+    )
+
+    if merge_col is not None:
+        set_diff.insert(0, merge_col)
+
+    return set_diff
+
+
+def downcast_df(df, errors="ignore", downcast="integer"):
+    """https://stackoverflow.com/questions/15891038/change-column-type-in-pandas"""
+    return df.apply(pd.to_numeric, errors=errors, downcast=downcast)
+
+
 def get_dict_subset(d, keys):
     """Subset dict based on a set of keys."""
     return {k: d.get(k, None) for k in keys}
@@ -99,7 +132,7 @@ def trim_whitespace(df):
     return df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
 
 
-def save_df_to_files(df, output_dir, fname_no_ext, ftypes=["csv", "pkl"]):
+def save_df_to_files(df, output_dir, fname_no_ext, ftypes=["csv", "pkl"], sep=","):
     """Save pd.DataFrame or pd.Series to multiple file types."""
 
     # check-create output directory
@@ -112,7 +145,8 @@ def save_df_to_files(df, output_dir, fname_no_ext, ftypes=["csv", "pkl"]):
                 os.path.join(
                     output_dir,
                     "{fname}.{ext}".format(fname=fname_no_ext, ext=ftype),
-                )
+                ),
+                sep=sep,
             )
         elif ftype == "pkl":
             df.to_pickle(
