@@ -103,6 +103,10 @@ def get_set_diff(df_left, df_right, merge_col=None):
     return set_diff
 
 
+def perc_missing(df):
+    return df.isna().sum() / df.shape[0]
+
+
 def downcast_df(df, errors="ignore", downcast="integer"):
     """https://stackoverflow.com/questions/15891038/change-column-type-in-pandas"""
     return df.apply(pd.to_numeric, errors=errors, downcast=downcast)

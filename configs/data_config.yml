@@ -18,7 +18,7 @@ lfs_eu:
   n_digits_isco08: 3
   n_digits_nace: 1
   n_digits_nuts: 2
-  years: ["2018"]
+  years: ["2019"]
   countries: [
     "AT", "BE", "BG", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR",
     "HU", "IE", "IS", "IT", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE",

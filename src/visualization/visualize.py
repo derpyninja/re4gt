@@ -68,11 +68,18 @@ class EulfsVis(EulfsDs):
         self.cols_to_calc_all = copy.copy(self.cols_to_calc)
         self.cols_to_calc_all.insert(0, "COEFF")
 
-        self.cols_main = [
+        self.cols_to_aggregate = [
             "COEFF_share_green_gtp_mean",
             "COEFF_share_green_esco_mean",
             "COEFF_share_brown_esco_mean",
             "COEFF_share_neutral_esco_mean",
+        ]
+
+        self.cols_to_plot = [
+            "COEFF_share_green_gtp_mean_relative",
+            "COEFF_share_green_esco_mean_relative",
+            "COEFF_share_brown_esco_mean_relative",
+            "COEFF_share_neutral_esco_mean_relative",
         ]
 
     # todo: potentially move to new class in features submodule
@@ -153,7 +160,7 @@ class EulfsVis(EulfsDs):
             .reset_index()
         )
 
-        for col in self.cols_main:
+        for col in self.cols_to_aggregate:
             df_all_agg_by_cntr_ind["{}_relative".format(col)] = (
                 df_all_agg_by_cntr_ind[col] / df_all_agg_by_cntr_ind["COEFF"]
             )
@@ -182,13 +189,13 @@ class EulfsVis(EulfsDs):
         # aggregate over occupations and countries
         df_all_agg_by_cntr_occ = (
             self.data_panel.groupby(
-                ["ISCO{}D_label".format(self.n_digits_isco08), "COUNTRYW"]
+                [self.fmt_string_isco_label.format(self.n_digits_isco08), "COUNTRYW"]
             )[self.cols_to_calc_all]
             .sum()
             .reset_index()
         )
 
-        for col in self.cols_main:
+        for col in self.cols_to_aggregate:
             df_all_agg_by_cntr_occ["{}_relative".format(col)] = (
                 df_all_agg_by_cntr_occ[col] / df_all_agg_by_cntr_occ["COEFF"]
             )
@@ -363,20 +370,13 @@ class EulfsVis(EulfsDs):
 
         df_all_agg_by_cntr_ind = self.aggregate_by_industry()
 
-        plotting_cols = [
-            "COEFF_share_green_gtp_mean_relative",
-            "COEFF_share_green_esco_mean_relative",
-            "COEFF_share_brown_esco_mean_relative",
-            "COEFF_share_neutral_esco_mean_relative",
-        ]
-
         y_var = "NACE{}D_label".format(self.n_digits_nace)
         hue_var = "COUNTRYW"
 
         n_hue_colors = len(df_all_agg_by_cntr_ind[hue_var].unique())
         palette = sns.color_palette("cubehelix", n_colors=n_hue_colors)
 
-        for x_var in plotting_cols:
+        for x_var in self.cols_to_plot:
             print("plotting variable: {}".format(x_var))
 
             # infer order (sorted by median in descending order)
@@ -453,20 +453,13 @@ class EulfsVis(EulfsDs):
 
         df_all_agg_by_cntr_occ = self.aggregate_by_occupation()
 
-        plotting_cols = [
-            "COEFF_share_green_gtp_mean_relative",
-            "COEFF_share_green_esco_mean_relative",
-            "COEFF_share_brown_esco_mean_relative",
-            "COEFF_share_neutral_esco_mean_relative",
-        ]
-
-        y_var = "ISCO{}D_label".format(self.n_digits_isco08)
+        y_var = self.fmt_string_isco_label.format(self.n_digits_isco08)
         hue_var = "COUNTRYW"
 
         n_colors = len(df_all_agg_by_cntr_occ[hue_var].unique())
         palette = sns.color_palette("cubehelix", n_colors=n_colors)
 
-        for x_var in plotting_cols:
+        for x_var in self.cols_to_plot:
             print("plotting variable: {}".format(x_var))
 
             # infer order (sorted by median in descending order)
@@ -604,8 +597,8 @@ if __name__ == "__main__":
         year=2019,
     )
 
-    eulfs_visualiser.create_maps(slice_by_industry=True)
+    # eulfs_visualiser.create_maps(slice_by_industry=True)
     # eulfs_visualiser.create_occupation_barplots(n_occ="all")
     # eulfs_visualiser.create_occupation_barplots(n_occ=10)
-    # eulfs_visualiser.create_occupation_barplots(n_occ=20)
+    eulfs_visualiser.create_occupation_barplots(n_occ=20)
     # eulfs_visualiser.create_industry_barplots()

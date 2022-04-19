@@ -7,8 +7,11 @@ from tqdm import tqdm
 from src import UsefulPaths, utils, stats_utils
 
 
-class EscoDs(UsefulPaths):
-    """ESCO Dataset Class"""
+class OccFramework(UsefulPaths):
+    """
+    Implements an occupational framework rooted in the European ESCO classification
+    and augmented by the US O*NET.
+    """
 
     def __init__(self, fn_config_data, fn_config_path):
         """
@@ -66,6 +69,12 @@ class EscoDs(UsefulPaths):
         self.green_id_onet = "is_green_onet"
         self.brown_id_onet = "is_brown_onet"
         self.neutral_id_onet = "is_neutral_onet"
+
+        # define fmt strings for ISCO classification
+        self.fmt_string_isco_lvl = "isco_level_{}"
+        self.fmt_string_isco_label = "isco_label_{}"
+        self.isco_join_col_of = "isco_code"
+
         # -----------------------------------------------------------------------------
         # functions for the aggregation of occupation data
         # -----------------------------------------------------------------------------
@@ -91,6 +100,7 @@ class EscoDs(UsefulPaths):
         self._skills_brown = None
         self._skills_hierarchy = None
         self._skills_groups = None
+        self._isco_groups = None
 
         # Mapping Career Causeways
         self._skills_hierarchy_mcc = None
@@ -126,7 +136,8 @@ class EscoDs(UsefulPaths):
                     "esco",
                     self.esco_version,
                     "occupations_{}.csv".format(self.esco_language),
-                )
+                ),
+                dtype={"iscoGroup": "str"}
             )
         return self._occupations
 
@@ -265,6 +276,20 @@ class EscoDs(UsefulPaths):
                 )
             )
         return self._skills_groups
+
+    @property
+    def isco_groups(self):
+        if self._isco_groups is None:
+            self._isco_groups = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    self.esco_version,
+                    "ISCOGroups_{}.csv".format(self.esco_language),
+                ),
+                dtype={"code": "str"}
+            )
+        return self._isco_groups
 
     @property
     def skills_hierarchy_mcc(self):
@@ -863,6 +888,24 @@ class EscoDs(UsefulPaths):
 
         return brown_occs_vona2018_esco
 
+    def isco_correspondence_table(self):
+        df_isco = self.isco_groups.copy()
+
+        for lvl in [1, 2, 3, 4]:
+            df_sub = df_isco.loc[
+                df_isco.code.str.len() == lvl, "preferredLabel"
+            ].reindex(df_isco.index)
+            df_isco["isco_label_{}".format(lvl)] = df_sub
+
+        df_isco = df_isco.rename(
+            columns={
+                "code": "isco_code",
+                "preferredLabel": "isco_label",
+            }
+        )
+
+        return df_isco
+
     def combine_occupation_metadata(self, export=True, fpath_out=None):
         # target fpath
         output_dir = os.path.join(self.data_interim, "esco", self.esco_version)
@@ -872,16 +915,30 @@ class EscoDs(UsefulPaths):
             # init container
             omd = self.occupations.copy()
 
-            # decompose isco 4-digit level
-            omd["isco_level_4"] = (
-                omd["iscoGroup"].astype(str).str.pad(width=4, side="left", fillchar="0")
+            # pad at 4d level
+            top_level = 4
+            omd[self.fmt_string_isco_lvl.format(top_level)] = (
+                omd["iscoGroup"].str.pad(width=top_level, side="left", fillchar="0")
             )
+
+            # decompose isco 4-digit into lower levels
             for lvl in [1, 2, 3]:
-                new_colname = "isco_level_{}".format(lvl)
+                new_colname = self.fmt_string_isco_lvl.format(lvl)
                 omd[new_colname] = omd["isco_level_4"].str[0:lvl]
 
+            # attach labels at each level
+            df_isco = self.isco_correspondence_table()
+
+            for lvl in [1, 2, 3, 4]:
+                omd = omd.merge(
+                    left_on=self.fmt_string_isco_lvl.format(lvl),
+                    right=df_isco.loc[:, ("isco_code",
+                                          self.fmt_string_isco_label.format(lvl))],
+                    right_on="isco_code",
+                ).drop(columns=["isco_code"])
+
             # merge onet codes and names via crosswalk
-            # occ_metadata = occ_metadata.merge(
+            # omd = omd.merge(
             #     right=self.crosswalk_onet_esco_mcc_full,
             #     left_on="conceptUri",
             #     right_on="concept_uri",
@@ -977,17 +1034,20 @@ class EscoDs(UsefulPaths):
             # make sure there are no duplicates
             assert omd.conceptUri.duplicated().sum() == 0
 
-        # update class variable
-        self.occupation_metadata = omd
+            # update class variable
+            self.occupation_metadata = omd
 
-        # optional: save for inspection
-        if export:
-            if fpath_out is None:
-                utils.save_df_to_files(
-                    omd, output_dir=output_dir, fname_no_ext=fname_no_ext, sep=";"
-                )
-            else:
-                omd.to_csv(fpath_out, sep=";")
+            # optional: save for inspection
+            if export:
+                if fpath_out is None:
+                    utils.save_df_to_files(
+                        omd, output_dir=output_dir, fname_no_ext=fname_no_ext, sep=";"
+                    )
+                else:
+                    omd.to_csv(fpath_out, sep=";")
+        else:
+            print("Occupation metadata already loaded.")
+            omd = self.occupation_metadata
 
         return omd
 
@@ -1032,11 +1092,13 @@ class EscoDs(UsefulPaths):
 
         list_of_occ_data = []
         for n_digits in isco08_digits:
-            group_var = "isco_level_{}".format(n_digits)
+            group_var_1 = self.fmt_string_isco_lvl.format(n_digits)
+            group_var_2 = self.fmt_string_isco_label.format(n_digits)
 
             # aggregate
             if not use_weights:
-                occ_grouped = self.occupation_metadata.groupby(group_var).agg(agg_dict)
+                occ_grouped = self.occupation_metadata.groupby([group_var_1, group_var_2
+                                                                ]).agg(agg_dict)
             else:
                 raise NotImplementedError("TODO: implement weighted aggregation")
 
@@ -1055,7 +1117,7 @@ class EscoDs(UsefulPaths):
             occ_grouped[gtp_cols] = occ_grouped[gtp_cols].fillna(0)
 
             # rename
-            occ_grouped["ISCO"] = occ_grouped[group_var]
+            occ_grouped[self.isco_join_col_of] = occ_grouped[group_var_1]
             # occ_grouped = occ_grouped.rename(columns={group_var: "ISCO"})
 
             # append to dict
@@ -1107,7 +1169,7 @@ if __name__ == "__main__":
     config_vis = "vis_config.yml"
 
     # ESCO
-    esco = EscoDs(
+    esco = OccFramework(
         fn_config_path=config_paths,
         fn_config_data=config_data,
     )

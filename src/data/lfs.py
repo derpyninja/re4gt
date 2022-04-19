@@ -4,7 +4,7 @@ import pandas as pd
 import geopandas as gpd
 
 from src import UsefulPaths, utils
-from src.data.esco import EscoDs
+from src.data.framework import OccFramework
 
 
 class LmData(UsefulPaths):
@@ -42,46 +42,8 @@ class LmData(UsefulPaths):
         self.path_geodata_nuts_4326 = self.path_geodata_nuts_4326
 
         # read relevant data across 3 dimensions: industry, occupation, region
-        self.df_isco08 = self._read_isco08()
         self.df_nace = self._read_nace()
         self.gdf_nuts = self._read_nuts()
-
-    # TODO (low priority): implement reading 1D ISCO classification
-    def _read_isco08(self):
-        """
-        Read ISCO-08 occupation data. Granularity depends on the data configuration
-        file parameter "n_digits_isco08".
-
-        Returns
-        -------
-        df_isco : pd.DataFrame
-            Mapping of ISCO-08 codes and labels at the desired granularity.
-        """
-        # read original data from ESCO
-        fpath = self.path_clsf_isco08.format(self.config_data["ESCO"]["VERSION_NEWEST"])
-        df_isco = pd.read_csv(
-            fpath, usecols=["code", "preferredLabel"], dtype={"code": "str"}
-        )
-
-        # subset depending on desired granularity
-        # df_isco = df_isco.loc[
-        #     df_isco.code.str.len() == self.n_digits_isco08
-        # ].reset_index(drop=True)
-
-        for lvl in [1, 2, 3, 4]:
-            df_sub = df_isco.loc[
-                df_isco.code.str.len() == lvl, "preferredLabel"
-            ].reindex(df_isco.index)
-            df_isco["ISCO{}D_label".format(lvl)] = df_sub
-
-        # rename
-        df_isco = df_isco.rename(
-            columns={
-                "code": "ISCO",
-                "preferredLabel": "ISCO_label",
-            }
-        )
-        return df_isco
 
     def _read_nace(self):
         return pd.read_csv(self.path_clsf_nace, delimiter=";")
@@ -93,7 +55,7 @@ class LmData(UsefulPaths):
         }
 
 
-class EulfsDs(LmData, EscoDs):
+class EulfsDs(LmData, OccFramework):
     """EU LFS Dataset Class"""
 
     def __init__(self, fn_config_data, fn_config_path):
@@ -102,7 +64,7 @@ class EulfsDs(LmData, EscoDs):
             self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
         )
 
-        EscoDs.__init__(
+        OccFramework.__init__(
             self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
         )
 
@@ -140,17 +102,11 @@ class EulfsDs(LmData, EscoDs):
         self.dtypes_out = self.config_data["lfs_eu"]["dtypes_out"]
 
         # column name formatters
-        self.isco08_colname_other = "ISCO"
-        self.isco08_colname_eulfs = "ISCO"
+        self.isco_join_col_eulfs = "ISCO"
         self.nace_colname = "NACE{}D".format(self.n_digits_nace)
 
-        # read occupation metadata
-        self.occupation_metadata = self.combine_occupation_metadata()
-
+        # read aggregated occupation metadata
         self.occupation_metadata_agg = self.aggregate_occ_data_by_isco()
-        # self.occupation_metadata_agg_subset = self.occupation_metadata_agg[
-        #     self.isco08_colname_other
-        # ]
 
     def preprocess(self):
         """"""
@@ -230,14 +186,14 @@ class EulfsDs(LmData, EscoDs):
                 if country in self.countries_isco08_2d:
                     # 2D
                     if df_sub["ISCO3D"].str.endswith("0").all():
-                        df_sub["ISCO"] = df_sub["ISCO3D"].str[:2]
+                        df_sub[self.isco_join_col_eulfs] = df_sub["ISCO3D"].str[:2]
                 elif country in self.countries_isco08_1d:
                     # 1D
                     if df_sub["ISCO3D"].str.endswith("00").all():
-                        df_sub["ISCO"] = df_sub["ISCO3D"].str[:1]
+                        df_sub[self.isco_join_col_eulfs] = df_sub["ISCO3D"].str[:1]
                 else:
                     # 3D
-                    df_sub["ISCO"] = df_sub["ISCO3D"]
+                    df_sub[self.isco_join_col_eulfs] = df_sub["ISCO3D"]
 
                 # append clean df
                 list_of_dfs.append(df_sub)
@@ -265,19 +221,14 @@ class EulfsDs(LmData, EscoDs):
         df_merged_all_vars = pd.merge(
             left=df_merged,
             right=self.occupation_metadata_agg,
-            left_on=self.isco08_colname_eulfs,
-            right_on=self.isco08_colname_other,
+            left_on=self.isco_join_col_eulfs,
+            right_on=self.isco_join_col_of,
             how="left",
         )
 
         # merge NACE code names
         df_merged_all_vars = pd.merge(
             df_merged_all_vars, self.df_nace, on=self.nace_colname, how="left"
-        )
-
-        # merge ISCO code names
-        df_merged_all_vars = pd.merge(
-            df_merged_all_vars, self.df_isco08, on=self.isco08_colname_eulfs, how="left"
         )
 
         # calc absolute employment numbers from shares
