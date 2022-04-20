@@ -404,6 +404,72 @@ class OccFramework(UsefulPaths):
     self._brown_occupations_onet = None
     """
 
+    def occupations_to_skills_md(self):
+        """Enrich occupation-skills mapping with additional metadata."""
+        cols_to_use = self.skills_metadata.columns.difference(
+            self.occupations_to_skills.columns)
+
+        # join select skills metadata to mapping
+        keep_cols_skills_md = [
+            'conceptUri', 'reuseLevel',
+            'preferredLabel', 'description', 'skill_classification_esco', 'coreness'
+        ]
+        join_col_right = "conceptUri"
+        occ_skills_mapping_smd_merged = pd.merge(
+            left=self.occupations_to_skills,
+            right=self.skills_metadata[keep_cols_skills_md],
+            left_on="skillUri",
+            right_on=join_col_right,
+            how="left",
+        ).drop(columns=[join_col_right])
+
+        # join select occ metadata to mapping
+        occupations = self.occupations.reset_index().rename(columns={"index": "id"})
+
+        keep_cols_occ_md = [
+            'id', 'conceptUri', 'iscoGroup', 'preferredLabel', 'description'
+        ]
+
+        occ_skills_mapping_all_merged = pd.merge(
+            left=occ_skills_mapping_smd_merged,
+            right=occupations[keep_cols_occ_md],
+            left_on="occupationUri",
+            right_on=join_col_right,
+            how="left",
+            suffixes=("_skills", "_occs")
+        ).drop(columns=[join_col_right])
+
+        return occ_skills_mapping_all_merged
+
+    def get_skills_for_occ(self, id=None, metadata=True, summary_only=True):
+        if metadata:
+            df_all = self.occupations_to_skills_md()
+        else:
+            raise NotImplementedError
+
+        # subset based on occupation id or label
+        if isinstance(id, str):
+            search_col = "preferredLabel_occs"
+        elif isinstance(id, int):
+            search_col = "id"
+        else:
+            raise NotImplementedError
+
+        df = df_all[df_all[search_col] == id]
+        df = df.reset_index(drop=True)
+
+        # summary
+        if summary_only:
+            keep_cols = [
+                "preferredLabel_occs", "preferredLabel_skills", "relationType",
+                "reuseLevel", "skillType", "skill_classification_esco", "coreness"
+            ]
+            df = df[keep_cols]
+
+        return df
+
+    # TODO: write function to get tasks for greening occupations/
+
     def _calc_osm_variants(self, occ_skills_matrix_eo):
         """
         Calculate weighted and unweighted forms from raw OSM.
@@ -700,14 +766,18 @@ class OccFramework(UsefulPaths):
     # todo: implement weighted form of esco-based greenness measure
     def calc_gbn_shares_skill_based(self, weighted=False):
         # read
-        osm = self.occupation_skills_matrix()
-        occ_skills_matrix_unweighted = osm["osm_unweighted"]
+        osms = self.occupation_skills_matrix()
+
+        if not weighted:
+            osm = osms["osm_unweighted"]
+        else:
+            osm = osms["osm_weighted"]
 
         if self.skills_metadata is None:
             self.combine_skills_metadata()
 
         # number of occupation-specific skills
-        n_total_specific_skills = occ_skills_matrix_unweighted.sum(axis=1).values
+        n_total_specific_skills = osm.sum(axis=1).values
 
         data_out = {
             "n_total_specific_skills": n_total_specific_skills,
@@ -724,7 +794,7 @@ class OccFramework(UsefulPaths):
 
                 # number of occupation-specific green/brown/neutral skills
                 specific_skills = (
-                    occ_skills_matrix_unweighted.values
+                    osm.values
                     * self.skills_metadata[col].astype(np.int8).values
                 )
 
@@ -742,7 +812,7 @@ class OccFramework(UsefulPaths):
                 colnames.append(colname_shares)
 
         df_occ_shares_per_skill_type = pd.DataFrame(
-            index=occ_skills_matrix_unweighted.index, data=data_out
+            index=osm.index, data=data_out
         )
 
         # check if shares sum to 100%
