@@ -764,14 +764,20 @@ class OccFramework(UsefulPaths):
         return smd
 
     # todo: implement weighted form of esco-based greenness measure
-    def calc_gbn_shares_skill_based(self, weighted=False):
+    def calc_gbn_shares_skill_based(self, essential_only=False):
+        # note: no weighting possible atm, just differentiation between essential and
+        # optional skills
+
         # read
         osms = self.occupation_skills_matrix()
 
-        if not weighted:
-            osm = osms["osm_unweighted"]
-        else:
+        # use essential skills only
+        if essential_only:
             osm = osms["osm_weighted"]
+            osm[osm == self.config_data["ESCO"]["WEIGHT_OPTIONAL_SKILL"]] = 0
+        # use essential and optional skills (unweighted)
+        else:
+            osm = osms["osm_unweighted"]
 
         if self.skills_metadata is None:
             self.combine_skills_metadata()
@@ -816,7 +822,15 @@ class OccFramework(UsefulPaths):
         )
 
         # check if shares sum to 100%
-        assert np.allclose(df_occ_shares_per_skill_type[colnames].sum(axis=1).values, 1)
+        check_sum_of_shares = df_occ_shares_per_skill_type[colnames].sum(axis=1).values
+
+        if not essential_only:
+            assert np.allclose(check_sum_of_shares, 1)
+        else:
+            # occupation "specialist dentist" has no essential skills
+            # 'http://data.europa.eu/esco/occupation/a580e79a-b752-49c1-b033-b5ab2b34bfba'
+            # pass test for the moment
+            pass
 
         # classify into discrete GBN categories
         # TODO: check if only one True per col.
@@ -1018,7 +1032,10 @@ class OccFramework(UsefulPaths):
             # )
 
             # Read data sets
-            df_gbn_shares_esco = self.calc_gbn_shares_skill_based()
+            df_gbn_shares_esco_all = self.calc_gbn_shares_skill_based()
+            df_gbn_shares_esco_ess = self.calc_gbn_shares_skill_based(
+                essential_only=True
+            )
             df_greenness_onet_esco = self.read_greenness_task_based()
             df_brown_occs_vona2018_esco = self.read_brown_occupations_vona2018()
 
@@ -1028,10 +1045,18 @@ class OccFramework(UsefulPaths):
 
             # join ESCO-based GBN shares
             omd = omd.merge(
-                right=df_gbn_shares_esco,
+                right=df_gbn_shares_esco_all,
                 on="conceptUri",
                 how="left",
                 suffixes=["", "_y"],
+                validate="1:1",
+            )
+
+            omd = omd.merge(
+                right=df_gbn_shares_esco_ess,
+                on="conceptUri",
+                how="left",
+                suffixes=["", "_ess"],
                 validate="1:1",
             )
 

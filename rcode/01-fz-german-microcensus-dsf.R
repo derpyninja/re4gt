@@ -1,29 +1,13 @@
----
-title: "First inspection of German Microcensus Datenstrukturfile"
-author: "Felix Zaussinger"
-date: "31.03.2022"
-output: 
-  bookdown::html_document2:
-    toc: true
-    toc_depth: 2
-    number_sections: true
-    df_print: paged
-    code_folding: hide
----
 
-```{r setup, include=FALSE, results='hide'}
-
-# set working directory (has to be changed at GWAP)
-rootdir = "T:/Documents/Projects/04_jrc_green-skills-regional/03_data-analysis/re4gt"
-
-# set knitr options
-knitr::opts_knit$set(root.dir = rootdir)
-knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, results='asis')
-options(digits=4)
-
+# -----------------------------------------------------------------------------
 # remove all objects from R workspace
 rm(list=ls())
 
+# set working directory (has to be changed at GWAP)
+rootdir = "T:/Documents/Projects/04_jrc_green-skills-regional/03_data-analysis/re4gt"
+setwd(rootdir)
+
+# -----------------------------------------------------------------------------
 # Load necessary packages
 library(tidyverse)
 library(readxl)
@@ -31,12 +15,9 @@ library(readxl)
 # set plotting theme
 theme_set(theme_classic())
 
-```
+# -----------------------------------------------------------------------------
 
-# Read data set  {-}
-
-```{r, load_data, include=FALSE}
-
+# load microcensus data
 fpath_dsf_csv <- file.path(getwd(), "data", "raw", "lfs", "de", "DSF_MZ 2019.CSV")
 
 
@@ -45,7 +26,7 @@ colClasses=c(
   "EF951"="numeric",
   "EF952"="numeric",
   "EF953"="numeric"
-  )
+)
 
 # read DSF, csv version
 dsf <- read.csv(
@@ -59,57 +40,10 @@ dsf <- read.csv(
 
 # replace all values < 0 with NA ("Not applicable" cases) 
 dsf[dsf < 0] = NA
-```
 
-# Preprocessing of data set  {-}
-
-## Step 1: Selection of variables for analysis {-}
-
-Filters
-  - EF39, Activity status (filter out unemployed persons)
-
-Demographic characteristics
-  - EF44: Age (demographics)
-  - EF46: Sex (demographics)
-  
-Occupation
-  - "EF114", "EF114UG1", "EF114UG2", "EF114UG3", "EF114UG4" : Current occupation, 5- to 1-digit (KldB 2010)
-  
-Industry
-  - "EF137", "EF137UG1" : Economic activity, 3- to 2-digit (WZ 2008)
-  
-Region
-  - EF189: Region of workplace (NUTS 2)
-  - EF196: Region of workplace (NUTS 3)
-  - EF564: Regionale Anpassungsschicht (> 500'000)
-  - EF568: Regionale Untergruppe (> 100'000)
-  - EF195: Place of work in DE?
-
-
-Workplace characteristics
-  - EF172: Main employment practiced (type of task)
-  - EF174: Department of workplace (department of worker)
-  - EF175: Status within enterprise/authority (employee/worker/official/self-employed)
-
-Income
-  - EF436: Personal net income of last month (required)
-  - EF442: Avg monthly income (voluntary)
-  
-Education
-  - EF517: highest level of educational/vocational training (ISCED)
-  - EF540: very similar to EF517 (or same)
-  
-Hochrechnungsfaktoren
-  - EF951: (bis EF564, Reg. Anp. Schichten)
-  - EF952: (bis EF564, Reg. Anp. Schichten)
-  - EF953: (bis EF568, Regionale Untergruppe = NUTS 3?)
-  
-## Step 2: coding of non-responses {-}
-
-## Step 3: filtering by conditions {-}
-labour status, age, etc.
-
-```{r, load_data, include=FALSE}
+# -----------------------------------------------------------------------------
+# Preprocessing
+# -----------------------------------------------------------------------------
 
 # selection of core variables
 # NOTE: uncomment commented lines when working with real data at GWAP
@@ -128,7 +62,7 @@ vars = c(
   # industry
   "EF137",
   "EF137UG1", 
-   # workplace characteristics
+  # workplace characteristics
   "EF172",
   # "EF174",
   "EF175",
@@ -149,7 +83,7 @@ vars = c(
   "EF951",
   "EF952",
   "EF953"
-  )
+)
 
 dsf_reduced <- dsf %>%
   select(all_of(vars))
@@ -174,8 +108,8 @@ dsf_nans_coded <- dsf_reduced %>%
     EF442 = replace(EF442, EF442 %in% c(99), NA),
     EF517 = replace(EF517, EF517 %in% c(999), NA),
     EF540 = replace(EF540, EF442 %in% c(99), NA),
-    )
-  
+  )
+
 # filtering criteria
 age_min <- 0
 age_max <- 95
@@ -188,50 +122,37 @@ dsf_filtered <- dsf_nans_coded %>%
 
 # convert dtypes
 dsf_final <- dsf_filtered %>%
-   mutate_if(is.integer, as.factor)
+  mutate_if(is.integer, as.factor)
 
 
-```
+# -----------------------------------------------------------------------------
+# Analysis
+# -----------------------------------------------------------------------------
 
-
-# Analysis of data set  {-}
-
-## Aggregation of yearly projection factors by occupation (5-digit)
-
-```{r}
+# Aggregation of yearly projection factors by occupation (5-digit)
 dsf_final %>%
   group_by(EF114) %>%
   summarise(
     sum_workers=sum(EF952)
   )
-```
 
-## Aggregation of yearly projection factors by industry (3-digit)
-
-```{r}
+# Aggregation of yearly projection factors by industry (3-digit)
 dsf_final %>%
   group_by(EF137) %>%
   summarise(
     sum_workers=sum(EF952)
   )
-```
 
-## Aggregation of yearly projection factors by occupation (5-digit) and industry (3-digit)
-
-```{r}
+# Aggregation of yearly projection factors by occupation (5-digit) and industry (3-digit)
 dsf_final %>%
   group_by(EF114, EF137) %>%
   summarise(
     sum_workers=sum(EF952)
   )
-```
 
-## Aggregation of yearly projection factors by occupation (5-digit) and region (reg. anp.)
-
-```{r}
+# Aggregation of yearly projection factors by occupation (5-digit) and region (reg. anp.)
 dsf_final %>%
   group_by(EF114, EF564) %>%
   summarise(
     sum_workers=sum(EF952)
   )
-```

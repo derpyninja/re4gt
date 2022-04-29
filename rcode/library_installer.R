@@ -1,4 +1,2 @@
 # install multiple data analysis libraries
-install.packages(pkgs = c("tidyverse", 
-                   "bookdown",
-                   "knitr"), dependencies = TRUE)
+install.packages(pkgs = c("tidyverse", "bookdown", "knitr"), dependencies = TRUE)
