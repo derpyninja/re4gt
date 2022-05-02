@@ -29,7 +29,7 @@ library(tidyverse)
 library(readxl)
 
 # set plotting theme
-theme_set(theme_classic())
+# theme_set(theme_classic())
 
 ```
 
