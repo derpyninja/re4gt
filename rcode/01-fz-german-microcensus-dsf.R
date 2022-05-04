@@ -22,11 +22,11 @@ fpath_dsf_csv <- file.path(getwd(), "data", "raw", "lfs", "de", "DSF_MZ 2019.CSV
 
 
 # specify data types for select cols
-colClasses=c(
-  "EF951"="numeric",
-  "EF952"="numeric",
-  "EF953"="numeric"
-)
+# colClasses=c(
+#   "EF951"="numeric",
+#   "EF952"="numeric",
+#   "EF953"="numeric"
+# )
 
 # read DSF, csv version
 dsf <- read.csv(
@@ -35,11 +35,15 @@ dsf <- read.csv(
   sep=";",
   dec=",",
   strip.white=TRUE,
-  colClasses = colClasses
+  # colClasses = colClasses
 )
+
+
 
 # replace all values < 0 with NA ("Not applicable" cases) 
 dsf[dsf < 0] = NA
+
+str(dsf)
 
 # -----------------------------------------------------------------------------
 # Preprocessing
@@ -121,10 +125,28 @@ dsf_filtered <- dsf_nans_coded %>%
   filter(EF195 == 1) # filter out people working abroad 
 
 # convert dtypes
-dsf_final <- dsf_filtered %>%
-  mutate_if(is.integer, as.factor)
+# dsf_final <- dsf_filtered %>%
+#   mutate_if(is.integer, as.factor)
+
+# -----------------------------------------------------------------------------
+# convert integer cols to factors while specifying levels from codebook
+# -----------------------------------------------------------------------------
+fpath_codebook <- file.path(getwd(), "rcode", "data", "codebook_microcensus_2019.xlsx")
+codebook <- read_excel(fpath_codebook)
+
+dsf_factors <- dsf_filtered
+names(dsf_factors)
+cols_to_convert = c("EF114")
+
+for (n in cols_to_convert){
+  temp <- filter(codebook, var_name == n) 
+  dsf_factors[[n]] <- factor(dsf_factors[[n]], levels = temp$value, labels = temp$label_en)
+}
+
+str(dsf_factors)
 
 
+dsf_final <- dsf_factors
 # -----------------------------------------------------------------------------
 # Analysis
 # -----------------------------------------------------------------------------

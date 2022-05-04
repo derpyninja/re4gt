@@ -4,7 +4,7 @@ import pandas as pd
 import geopandas as gpd
 
 from src import UsefulPaths, utils
-from src.data.framework import OccFramework
+from src.data.framework import Esco
 
 
 class LmData(UsefulPaths):
@@ -55,7 +55,7 @@ class LmData(UsefulPaths):
         }
 
 
-class EulfsDs(LmData, OccFramework):
+class EulfsDs(LmData, Esco):
     """EU LFS Dataset Class"""
 
     def __init__(self, fn_config_data, fn_config_path):
@@ -64,9 +64,7 @@ class EulfsDs(LmData, OccFramework):
             self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
         )
 
-        OccFramework.__init__(
-            self=self, fn_config_data=fn_config_data, fn_config_path=fn_config_path
-        )
+        Esco.__init__(self=self)
 
         # static params
         self.fmt_folder = "{}_YEAR_1998_onwards"

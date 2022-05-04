@@ -597,8 +597,8 @@ if __name__ == "__main__":
         year=2019,
     )
 
-    # eulfs_visualiser.create_maps(slice_by_industry=True)
+    eulfs_visualiser.create_maps(slice_by_industry=True)
     # eulfs_visualiser.create_occupation_barplots(n_occ="all")
     # eulfs_visualiser.create_occupation_barplots(n_occ=10)
-    eulfs_visualiser.create_occupation_barplots(n_occ=20)
+    # eulfs_visualiser.create_occupation_barplots(n_occ=20)
     # eulfs_visualiser.create_industry_barplots()

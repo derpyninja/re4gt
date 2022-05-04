@@ -2,7 +2,7 @@ import logging
 from src.data import preprocess
 from src.visualization import visualize
 from src.data.lfs import EulfsDs
-from src.data.framework import OccFramework
+from src.data.framework import Esco
 from src.visualization.visualize import EulfsVis
 
 # CONFIGS
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # ---------------------------------------------------------------------------------
 
     # ESCO
-    # esco = OccFramework(
+    # esco = Esco(
     #     fn_config_path=config_paths,
     #     fn_config_data=config_data,
     # )

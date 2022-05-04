@@ -4,40 +4,133 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+import src
 from src import UsefulPaths, utils, stats_utils
+useful_paths = src.UsefulPaths()
 
 
-class OccFramework(UsefulPaths):
-    """
-    Implements an occupational framework rooted in the European ESCO classification
-    and augmented by the US O*NET.
-    """
-
-    def __init__(self, fn_config_data, fn_config_path):
-        """
-        Initialise ESCO class based on configuration file settings.
-
-        Parameters
-        ----------
-        fn_config_data : str
-            Name of yml file with ESCO-specific configurations.
-        fn_config_path : str
-            Name of yml file storing additional path-specific configurations.
-        """
+class Crosswalks(UsefulPaths):
+    def __init__(self):
         # inherit class storing useful paths
-        UsefulPaths.__init__(self=self, fn_config_path=fn_config_path)
+        UsefulPaths.__init__(self=self)
 
-        # -----------------------------------------------------------------------------
-        # parse config file
-        # -----------------------------------------------------------------------------
-        self.config_data = utils.load_config(
-            os.path.join(self.config_dir, fn_config_data)
-        )
+        # ONET-ESCO crosswalks by Kanders et al. (2020)
+        self._onet_esco_mcc_full = None
+        self._onet_esco_mcc_reduced = None
+
+        self._onet_isco_jrc = None
+        self._esco_kldb2010 = None
+        self._esco_cp2011 = None
+
+
+class Onet(UsefulPaths):
+    """Stores O*NET-specific data on green/brown occupations and tasks."""
+    def __init__(self):
+        # inherit class storing useful paths
+        UsefulPaths.__init__(self=self)
+
+        self._green_tasks_gtp = None
+        self._green_occupations_gtp = None
+        self._green_occupations_vona2018 = None
+        self._brown_occupations_vona2018 = None
+
+    @property
+    def green_tasks_gtp(self):
+        """
+        Green tasks from ONET Green Task Project.
+        SOC 8-digit level, 138 occupations.
+
+        Returns
+        -------
+
+        """
+        if self._green_tasks_gtp is None:
+            self._green_tasks_gtp = pd.read_excel(
+                io=os.path.join(
+                    self.data_raw,
+                    "onet",
+                    "Onet_GreenTask_AppA.xlsx",
+                ),
+                sheet_name="Tasks",
+            )
+        return self._green_tasks_gtp
+
+    @property
+    def green_occupations_gtp(self):
+        """
+        Greenness scores from ONET Green Task Project.
+        SOC 8-digit level, 138 occupations.
+
+        Returns
+        -------
+
+        """
+        if self._green_occupations_gtp is None:
+            self._green_occupations_gtp = pd.read_excel(
+                io=os.path.join(
+                    self.data_raw,
+                    "onet",
+                    "Onet_GreenTask_AppA.xlsx",
+                ),
+                sheet_name="Occupations",
+            )
+        return self._green_occupations_gtp
+
+    @property
+    def green_occupations_vona2018(self):
+        """
+        Greenness scores from Vona et al. (2018).
+        SOC 8-digit level, 111 occupations.
+
+        Returns
+        -------
+
+        """
+        if self._green_occupations_vona2018 is None:
+            self._green_occupations_vona2018 = pd.read_excel(
+                io=os.path.join(
+                    self.data_raw, "onet", "Vona2018_table_a1.xlsx"
+                ),
+                sheet_name="Greenness",
+            )
+        return self._green_occupations_vona2018
+
+    @property
+    def brown_occupations_vona2018(self):
+        """
+        Classification of brown occupations from Vona et al. (2018).
+        SOC 6-digit level, 111 occupations.
+
+        Returns
+        -------
+
+        """
+        if self._brown_occupations_vona2018 is None:
+            self._brown_occupations_vona2018 = pd.read_csv(
+                os.path.join(
+                    self.data_raw, "onet", "Vona2018_brown_occupations.csv"
+                )
+            )
+
+            # pad to 8 digits
+            self._brown_occupations_vona2018["soc_code"] = self._brown_occupations_vona2018["soc_code"] + ".00"
+
+        return self._brown_occupations_vona2018
+
+
+class Esco(UsefulPaths):
+    """
+    Stores data from the European ESCO classification.
+    """
+
+    def __init__(self, language="en", version="v1.1.0", version_newest="v1.1.0"):
+        # inherit class storing useful paths
+        UsefulPaths.__init__(self=self)
 
         # extract language and versions
-        self.esco_language = self.config_data["ESCO"]["LANGUAGE"]  # "en"
-        self.esco_version = self.config_data["ESCO"]["VERSION"]  # "v1.0.3" or "v1.1.0"
-        self.esco_version_newest = self.config_data["ESCO"]["VERSION_NEWEST"]
+        self.esco_language = language  # "en"
+        self.esco_version = version  # "v1.0.3" or "v1.1.0"
+        self.esco_version_newest = version_newest  # "v1.1.0"
         self.esco_skills_hierarchy_version = (
             "v1.0.8" if self.esco_version == "v1.0.3" else "v1.1.0"
         )
@@ -214,7 +307,7 @@ class OccFramework(UsefulPaths):
         if self._skills_green is None:
             self._skills_green = pd.read_excel(
                 os.path.join(
-                    self.data_external,
+                    self.data_raw,
                     "esco",
                     self.esco_version_newest,
                     "GreenBrownSkillsValidationETH.xlsx",
@@ -235,7 +328,7 @@ class OccFramework(UsefulPaths):
         if self._skills_brown is None:
             self._skills_brown = pd.read_excel(
                 os.path.join(
-                    self.data_external,
+                    self.data_raw,
                     "esco",
                     self.esco_version_newest,
                     "GreenBrownSkillsValidationETH.xlsx",
@@ -852,7 +945,6 @@ class OccFramework(UsefulPaths):
             io=os.path.join(
                 self.data_raw,
                 "onet",
-                "green_task_project",
                 "Onet_GreenTask_AppA.xlsx",
             ),
             sheet_name="Occupations",
@@ -860,7 +952,7 @@ class OccFramework(UsefulPaths):
 
         greenness_onet_vona = pd.read_excel(
             io=os.path.join(
-                self.data_raw, "onet", "vona_2018", "vona_2018_table_a1.xlsx"
+                self.data_raw, "onet", "Vona2018_table_a1.xlsx"
             ),
             sheet_name="Greenness",
         )
@@ -908,7 +1000,7 @@ class OccFramework(UsefulPaths):
 
     def read_brown_occupations_vona2018(self):
         """
-        Read Vona et al. 2019 brown occupation classification and merge to ESCO occupations via Nesta ONET-ESCO crosswalk.
+        Read Vona et al. 2018 brown occupation classification and merge to ESCO occupations via Nesta ONET-ESCO crosswalk.
 
         Returns
         -------
@@ -916,7 +1008,7 @@ class OccFramework(UsefulPaths):
         """
         brown_occs_vona2018 = pd.read_csv(
             os.path.join(
-                self.data_raw, "onet", "vona_2018", "brown_occupations_vona2018.csv"
+                self.data_raw, "onet", "Vona2018_brown_occupations.csv"
             )
         )
 
@@ -1257,21 +1349,8 @@ def classify_by_gbn(
 
 
 if __name__ == "__main__":
-    # CONFIGS
-    config_paths = "paths_config.yml"
-    config_data = "data_config.yml"
-    config_model = "model_config.yml"
-    config_vis = "vis_config.yml"
 
     # ESCO
-    esco = OccFramework(
-        fn_config_path=config_paths,
-        fn_config_data=config_data,
-    )
+    esco = Esco()
+    print(esco.esco_language)
 
-    # esco.occupation_skills_matrix()
-    # esco.occupation_similarity_matrix()
-    esco.combine_skills_metadata()
-    # esco.read_greenness_task_based()
-    esco.combine_occupation_metadata()
-    # esco.aggregate_occ_data_by_isco()
