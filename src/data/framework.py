@@ -6,10 +6,13 @@ from tqdm import tqdm
 
 import src
 from src import UsefulPaths, utils, stats_utils
+
 useful_paths = src.UsefulPaths()
 
 
 class Crosswalks(UsefulPaths):
+    """Stores crosswalks between various occupational frameworks."""
+
     def __init__(self):
         # inherit class storing useful paths
         UsefulPaths.__init__(self=self)
@@ -18,20 +21,266 @@ class Crosswalks(UsefulPaths):
         self._onet_esco_mcc_full = None
         self._onet_esco_mcc_reduced = None
 
-        self._onet_isco_jrc = None
-        self._esco_kldb2010 = None
-        self._esco_cp2011 = None
+        self._onet_soc10 = None
+
+        self._soc10_isco08_ibs = None
+        self._onet_isco08_jrc = None
+
+        self._esco_de_kldb2010 = None
+        self._esco_it_cp2011 = None
+
+    @property
+    def onet_esco_mcc_full(self):
+        """
+        MCC ONET-ESCO crosswalk for the full set of ESCO v.1.0.3 occupations.
+        2942 unique ESCO occupations are matched to 669 unique ONET occupations.
+
+        This crosswalk misses out on 63 of the 138 O*NET "greening" occupations. The
+        reason for this is (explanation by Karlis Kanders):
+
+        "Although we hopefully have O*NET matches for every ESCO
+        occupation - not every O*NET occupation has been matched to an ESCO occupation.
+        The reason is because we wanted to use O*NET features in the context of
+        transitioning between European ESCO occupations - so it was enough to find the
+        closest O*NET occupation for each ESCO occupation."
+
+        Returns
+        -------
+
+        """
+        if self._onet_esco_mcc_full is None:
+            self._onet_esco_mcc_full = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "mapping-career-causeways",
+                    "codebase",
+                    "data",
+                    "processed",
+                    "ESCO_ONET_xwalk_full.csv",
+                )
+            )
+        return self._onet_esco_mcc_full
+
+    @property
+    def onet_esco_mcc_reduced(self):
+        """
+        MCC ONET-ESCO crosswalk for the 5-digit ESCO occupations. Lower-level (6, 7, 8)
+        occupations inherit the same mapping as their parent.
+
+        1680 unique level-5 ESCO occupations are mapped to 668 unique O*NET occupations.
+
+        Same problem as with the full crosswalk, it misses a substantial amount of
+        O*NET greening occupations due to the same reason as outlined in the description
+        of the onet_esco_mcc_full function.
+
+        Returns
+        -------
+
+        """
+        if self._onet_esco_mcc_reduced is None:
+            self._onet_esco_mcc_reduced = pd.read_csv(
+                os.path.join(
+                    useful_paths.data_raw,
+                    "mapping-career-causeways",
+                    "supplementary_online_data",
+                    "ONET_ESCO_crosswalk",
+                    "esco_onet_crosswalk_Nov2020.csv",
+                )
+            )
+        return self._onet_esco_mcc_reduced
+
+    @property
+    def onet_soc10(self):
+        """
+        Lookup table between 1110 8-digit O*NET-SOC and 841 6-digit SOC occupations.
+        From the supplementary online data of the MCC project.
+
+        Returns
+        -------
+
+        """
+        if self._onet_soc10 is None:
+            self._onet_soc10 = pd.read_excel(
+                os.path.join(
+                    useful_paths.data_raw,
+                    "mapping-career-causeways",
+                    "supplementary_online_data",
+                    "ONET_ESCO_crosswalk",
+                    "lookups",
+                    "ONET_to_US2010SOC.xlsx",
+                )
+            )
+        return self._onet_soc10
+
+    @property
+    def soc10_isco08_ibs(self):
+        """
+        Crosswalk from 839 6-digit SOC-2010 to 436 4-digit ISCO-08 occupations from the
+        Institute for Structural Research - IBS.
+
+        Returns
+        -------
+
+        """
+        if self._soc10_isco08_ibs is None:
+            self._soc10_isco08_ibs = pd.read_stata(
+                os.path.join(
+                    useful_paths.data_raw,
+                    "crosswalks",
+                    "onetsoc_to_isco_cws_ibs",
+                    "soc10_isco08.dta",
+                )
+            )
+        return self._soc10_isco08_ibs
+
+    @property
+    def onet_isco08_jrc(self):
+        """
+        Crosswalk from 839 6-digit SOC-2010 to 436 4-digit ISCO-08 occupations from the
+        Institute for Structural Research - IBS.
+
+        Returns
+        -------
+
+        """
+        if self._onet_isco08_jrc is None:
+            self._onet_isco08_jrc = pd.read_stata(
+                os.path.join(
+                    useful_paths.data_raw,
+                    "crosswalks",
+                    "onetsoc_to_isco_cws_ibs",
+                    "soc10_isco08.dta",
+                )
+            )
+        return self._onet_isco08_jrc
+
+    @property
+    def esco_de_kldb2010(self):
+        """
+        Crosswalk ESCO 1.0.3 - DE (KldB-2010) shared by ESCO team (NOT FINISHED).
+
+        ESCO Version: ESCO V.1.0.3 (2942 unique occupations)
+        Kldb Version: 2010 (2081 unique occupations)
+
+        Note (After dropping rows without matches):
+        - 2792 unique ESCO occupations
+        - 2079 unique KldB occupations (5 digits)
+
+        Returns
+        -------
+
+        """
+        if self._esco_de_kldb2010 is None:
+            self._esco_de_kldb2010 = pd.read_csv(
+                os.path.join(
+                    useful_paths.data_raw,
+                    "crosswalks",
+                    "ESCO_DE_Berufenet_mapping_draft_20220324.csv",
+                ),
+                header=14,
+            )
+
+            # Customise column names
+            self._esco_de_kldb2010.columns = self._esco_de_kldb2010.columns.str.split(
+                " "
+            ).str.join("_")
+
+        return self._esco_de_kldb2010
+
+    @property
+    def esco_it_cp2011(self):
+        """
+        Crosswalk ESCO 1.0.8 - IT CP-2011 (FINISHED). Shared by ESCO team.
+        classificazione delle professioni: http://professioni.istat.it/cp2011/.
+
+        Note:
+        - 2980 unique ESCO occupations
+        - 829 unique CP-2011 occupations (5-digit)
+        - a small number of occupations are not labelled in both classifications
+
+        Returns
+        -------
+
+        """
+        if self._esco_it_cp2011 is None:
+            self._esco_it_cp2011 = pd.read_csv(
+                os.path.join(
+                    useful_paths.data_raw, "crosswalks", "ESCO_IT_mapping_23042021.csv"
+                ),
+                header=14,
+            )
+
+            # Customise column names
+            self._esco_it_cp2011.columns = self._esco_it_cp2011.columns.str.split(
+                " "
+            ).str.join("_")
+
+        return self._esco_it_cp2011
+
+    def it_cp2011_de_kldb2010(
+        self,
+        save=True,
+        out_dir=os.path.join(useful_paths.data_interim, "crosswalks"),
+        out_fname="crosswalk_it_cp2011_de_kldb2010_reduced",
+    ):
+        """
+        Construct bridge between IT and DE classifications via ESCO.
+
+        Returns
+        -------
+
+        """
+        cw_de_esco = self.esco_de_kldb2010
+        cw_it_esco = self.esco_it_cp2011
+
+        # drop instances without match and convert ID to int
+        cw_de_esco = cw_de_esco.loc[cw_de_esco["Mapping_relation"] != "no relation"]
+        cw_de_esco.loc[:, "Classification_2_ID"] = cw_de_esco.loc[
+            :, "Classification_2_ID"
+        ].astype(int)
+
+        # Join German mapping on Italian mapping
+        cw_it_de = pd.merge(
+            left=cw_it_esco,
+            right=cw_de_esco,
+            on="Classification_1_URI",
+            how="left",
+            suffixes=("_it", "_de"),
+            validate="m:m",
+        )
+
+        # Drop rows where no match in German KldB was found
+        cw_it_de_reduced = cw_it_de.dropna(subset=["Classification_2_ID_de"])
+        cw_it_de_reduced.loc[:, "Classification_2_ID_de"] = cw_it_de_reduced.loc[
+            :, "Classification_2_ID_de"
+        ].astype(int)
+
+        # save
+        if save:
+            utils.save_df_to_files(
+                cw_it_de_reduced,
+                output_dir=out_dir,
+                fname_no_ext=out_fname,
+                ftypes=["csv"],
+            )
+
+        return cw_it_de_reduced
 
 
 class Onet(UsefulPaths):
     """Stores O*NET-specific data on green/brown occupations and tasks."""
+
     def __init__(self):
         # inherit class storing useful paths
         UsefulPaths.__init__(self=self)
 
         self._green_tasks_gtp = None
+        self._green_tasks_narrow_jrc = None
+
         self._green_occupations_gtp = None
         self._green_occupations_vona2018 = None
+        self._green_occupations_narrow_jrc = None
+
         self._brown_occupations_vona2018 = None
 
     @property
@@ -88,9 +337,7 @@ class Onet(UsefulPaths):
         """
         if self._green_occupations_vona2018 is None:
             self._green_occupations_vona2018 = pd.read_excel(
-                io=os.path.join(
-                    self.data_raw, "onet", "Vona2018_table_a1.xlsx"
-                ),
+                io=os.path.join(self.data_raw, "onet", "Vona2018_table_a1.xlsx"),
                 sheet_name="Greenness",
             )
         return self._green_occupations_vona2018
@@ -107,15 +354,75 @@ class Onet(UsefulPaths):
         """
         if self._brown_occupations_vona2018 is None:
             self._brown_occupations_vona2018 = pd.read_csv(
-                os.path.join(
-                    self.data_raw, "onet", "Vona2018_brown_occupations.csv"
-                )
+                os.path.join(self.data_raw, "onet", "Vona2018_brown_occupations.csv")
             )
 
             # pad to 8 digits
-            self._brown_occupations_vona2018["soc_code"] = self._brown_occupations_vona2018["soc_code"] + ".00"
+            # self._brown_occupations_vona2018["soc_code"] = (
+            #     self._brown_occupations_vona2018["soc_code"] + ".00"
+            # )
 
         return self._brown_occupations_vona2018
+
+    @property
+    def green_tasks_narrow_jrc(self):
+        """
+        Greenness scores from O*NET GTP mapped to Italian Classification of
+        Occupations (CP2011) at 5-digit level.
+
+        Notes:
+        - 117 unique ISCO 5-digit occupations are covered (narrow classification scope)
+        - Harmonized occ name of “Machinery operators for dry cleaning, bleaching and
+            dyeing of industrial yarns and fabrics” (7.2.6.4.0) in excel file
+        - corrected inconsistent greenness scores across tasks of same occupations
+        Returns
+        -------
+
+        """
+        if self._green_tasks_narrow_jrc is None:
+            self._green_tasks_narrow_jrc = pd.read_excel(
+                os.path.join(
+                    self.data_raw, "onet", "Green_Occupations_jrc_v1_02052022.xlsx"
+                )
+            )
+        return self._green_tasks_narrow_jrc
+
+    @property
+    def green_occupations_narrow_jrc(self):
+        """
+        Greenness scores from O*NET GTP mapped to Italian Classification of
+        Occupations (CP2011) at 5-digit level.
+
+        Task-level data collapsed into occupation-level data
+
+        Returns
+        -------
+
+        """
+        if self._green_occupations_narrow_jrc is None:
+            # collapse task-level into occupation-level data
+            group_cols = ["isco08_jrc", "occ_eng_jrc"]
+
+            # define how cols should be aggregated
+            agg_dict = {
+                "n_green_tasks_jrc": np.sum,
+                "n_tasks_jrc": np.mean,
+                "greenness_jrc": np.mean,
+            }
+
+            # aggregate
+            greenness_jrc = (
+                self.green_tasks_narrow_jrc.groupby(group_cols)
+                .aggregate(agg_dict)
+                .reset_index()
+            )
+
+            # check if keys are unique
+            assert greenness_jrc[group_cols[0]].duplicated().sum() == 0
+            assert greenness_jrc[group_cols[1]].duplicated().sum() == 0
+
+            self._green_occupations_narrow_jrc = greenness_jrc
+        return self._green_occupations_narrow_jrc
 
 
 class Esco(UsefulPaths):
@@ -230,7 +537,7 @@ class Esco(UsefulPaths):
                     self.esco_version,
                     "occupations_{}.csv".format(self.esco_language),
                 ),
-                dtype={"iscoGroup": "str"}
+                dtype={"iscoGroup": "str"},
             )
         return self._occupations
 
@@ -380,7 +687,7 @@ class Esco(UsefulPaths):
                     self.esco_version,
                     "ISCOGroups_{}.csv".format(self.esco_language),
                 ),
-                dtype={"code": "str"}
+                dtype={"code": "str"},
             )
         return self._isco_groups
 
@@ -490,22 +797,20 @@ class Esco(UsefulPaths):
     def crosswalk_onet_esco_mcc_reduced(self):
         pass
 
-    """
-
-    # ONET-specific data
-    self._green_occupations_onet = None
-    self._brown_occupations_onet = None
-    """
-
     def occupations_to_skills_md(self):
         """Enrich occupation-skills mapping with additional metadata."""
         cols_to_use = self.skills_metadata.columns.difference(
-            self.occupations_to_skills.columns)
+            self.occupations_to_skills.columns
+        )
 
         # join select skills metadata to mapping
         keep_cols_skills_md = [
-            'conceptUri', 'reuseLevel',
-            'preferredLabel', 'description', 'skill_classification_esco', 'coreness'
+            "conceptUri",
+            "reuseLevel",
+            "preferredLabel",
+            "description",
+            "skill_classification_esco",
+            "coreness",
         ]
         join_col_right = "conceptUri"
         occ_skills_mapping_smd_merged = pd.merge(
@@ -520,7 +825,11 @@ class Esco(UsefulPaths):
         occupations = self.occupations.reset_index().rename(columns={"index": "id"})
 
         keep_cols_occ_md = [
-            'id', 'conceptUri', 'iscoGroup', 'preferredLabel', 'description'
+            "id",
+            "conceptUri",
+            "iscoGroup",
+            "preferredLabel",
+            "description",
         ]
 
         occ_skills_mapping_all_merged = pd.merge(
@@ -529,7 +838,7 @@ class Esco(UsefulPaths):
             left_on="occupationUri",
             right_on=join_col_right,
             how="left",
-            suffixes=("_skills", "_occs")
+            suffixes=("_skills", "_occs"),
         ).drop(columns=[join_col_right])
 
         return occ_skills_mapping_all_merged
@@ -554,18 +863,143 @@ class Esco(UsefulPaths):
         # summary
         if summary_only:
             keep_cols = [
-                "preferredLabel_occs", "preferredLabel_skills", "relationType",
-                "reuseLevel", "skillType", "skill_classification_esco", "coreness"
+                "preferredLabel_occs",
+                "preferredLabel_skills",
+                "relationType",
+                "reuseLevel",
+                "skillType",
+                "skill_classification_esco",
+                "coreness",
             ]
             df = df[keep_cols]
 
         return df
 
-    # TODO: write function to get tasks for greening occupations/
+    def label_osm(self, osm):
+        osm.index = self.occupations["preferredLabel"].values
+        osm.columns = self.skills["preferredLabel"].values
+        return osm
+
+    def read_occ_skills_matrix(
+        self,
+        encoding_essential=1,
+        encoding_optional=2,
+        encoding_none=0,
+        override=False,
+        weight_optional=0.5,
+        return_version="raw",
+        assign_labels=False,
+        target_path=os.path.join(
+            useful_paths.data_interim, "esco", "occ_skills_matrix.pkl"
+        ),
+    ):
+        """
+        Calculate occupation-skills matrix (OSM) based on ESCO data. In the OSM rows
+        denote occupations and columns skills. Essential and optional skills are
+        differentiated based on the encodings. Weights for the optional skills can
+        be assigned.
+
+        Parameters
+        ----------
+        encoding_essential
+        encoding_optional
+        encoding_none
+        override
+        weight_optional
+        return_version : str
+            one of ["raw", "unweighted", "weighted"]
+        assign_labels
+        target_path
+
+        Returns
+        -------
+
+        """
+
+        if override or not os.path.exists(target_path):
+            # build occupation skills matrix
+            errors = 0
+            skill_vectors = []
+
+            for i in tqdm(range(len(self.occupations))):
+                occ_uri = self.occupations.iloc[i, :][1]
+
+                # lookup corresponding skills
+                skill_list = self.occupations_to_skills[
+                    self.occupations_to_skills["occupationUri"] == occ_uri
+                ]
+
+                # create vector
+                skill_vector = []
+                for j, skill in enumerate(self.skills.conceptUri.values):
+
+                    if skill in skill_list.skillUri.values:
+                        relation_type = skill_list.loc[
+                            skill_list.skillUri == skill, "relationType"
+                        ].values[0]
+
+                        # skill needed for occupation and essential
+                        if relation_type == "essential":
+                            skill_vector.append(encoding_essential)
+                        # skill needed for occupation and optional
+                        elif relation_type == "optional":
+                            skill_vector.append(encoding_optional)
+                    else:
+                        # skill not needed for occupation
+                        skill_vector.append(encoding_none)
+
+                # checkme: what is this line good for?
+                indices = [i for i, j in enumerate(skill_vector) if j == 1]
+
+                # sanity check
+                if len(skill_list.skillUri) != np.sum(
+                    np.invert(np.array(skill_vector) == 0)
+                ):
+                    errors += 1
+
+                # append
+                skill_vectors.append(skill_vector)
+
+            # info
+            print("n_errors: ", errors)
+
+            # create df
+            occ_skills_matrix_eo = pd.DataFrame(
+                index=self.occupations.conceptUri,
+                columns=self.skills.conceptUri,
+                data=np.array(skill_vectors),
+            )
+
+            # save to disk
+            occ_skills_matrix_eo.to_pickle(target_path)
+        else:
+            # read matrix from disk
+            occ_skills_matrix_eo = pd.read_pickle(target_path)
+
+            # differentiate between weighted and unweighted matrix
+            if return_version == "unweighted":
+                # assign encoding of essential skills (1) to optional skills
+                occ_skills_matrix_eo.replace(
+                    to_replace=encoding_optional, value=encoding_essential, inplace=True
+                )
+            elif return_version == "weighted":
+                # assign specified weight to optional skills
+                occ_skills_matrix_eo.replace(
+                    to_replace=encoding_optional, value=weight_optional, inplace=True
+                )
+            else:
+                # return raw, encoded version
+                pass
+
+            # optionally return labelled OSM
+            if assign_labels:
+                occ_skills_matrix_eo = self.label_osm(occ_skills_matrix_eo)
+
+        return occ_skills_matrix_eo
 
     def _calc_osm_variants(self, occ_skills_matrix_eo):
         """
-        Calculate weighted and unweighted forms from raw OSM.
+        Calculate weighted and return_unweighted forms from raw OSM.
 
         Parameters
         ----------
@@ -586,7 +1020,7 @@ class Esco(UsefulPaths):
             to_replace=replace_weighted
         )
 
-        # calc unweighted form
+        # calc return_unweighted form
         occ_skills_matrix_unweighted = occ_skills_matrix_eo.replace(
             to_replace=[1, 2], value=self.config_data["ESCO"]["WEIGHT_UNIFORM"]
         )
@@ -601,7 +1035,7 @@ class Esco(UsefulPaths):
         Calculate occupation-skills matrix (OSM) based on ESCO data. In the OSM rows
         denote occupations and columns skills. Depending on the settings in the main
         configuration file, essential and optional skills are assigned different
-        weights on an occupation-to-occupation basis. An unweighted variant is
+        weights on an occupation-to-occupation basis. An return_unweighted variant is
         always also created as a baseline.
 
         Returns
@@ -609,7 +1043,7 @@ class Esco(UsefulPaths):
         dict
             Dictionary storing two variants of the OSM as pd.DataFrame:
                 (1) the weighted form (coded as np.float),
-                (2) the unweighted/uniform form (coded as np.int8)
+                (2) the return_unweighted/uniform form (coded as np.int8)
         """
         logger = logging.getLogger(__name__)
         logger.info("Creating occupation-skills matrix.")
@@ -617,7 +1051,6 @@ class Esco(UsefulPaths):
         target_path = os.path.join(
             self.data_interim,
             "esco",
-            self.esco_version,
             "occ_skills_matrix.pkl",
         )
 
@@ -685,7 +1118,7 @@ class Esco(UsefulPaths):
 
     def occupation_similarity_matrix(self):
         """
-        Calculate weighted and unweighted forms of the co-occurrence occupation
+        Calculate weighted and return_unweighted forms of the co-occurrence occupation
         similarity matrix (OSIM).
 
         Returns
@@ -693,7 +1126,7 @@ class Esco(UsefulPaths):
         dict
             Dictionary containing X versions of the OSIM:
                 (1) Skills COO based on weighted OSM
-                (2) Skills COO based on unweighted OSM
+                (2) Skills COO based on return_unweighted OSM
         """
         logger = logging.getLogger(__name__)
 
@@ -714,7 +1147,7 @@ class Esco(UsefulPaths):
             variant = osm_version.split("_")[1]
 
             # fixme: calculation of unweighted COOC matrix does not work
-            if variant == "unweighted":
+            if variant == "return_unweighted":
                 continue
 
             logger.info("Calculating {} occupation similarity matrix.".format(variant))
@@ -740,7 +1173,22 @@ class Esco(UsefulPaths):
 
         return osim_dict
 
-    def combine_skills_metadata(self, export=True, fpath_out=None):
+    def combine_skills_metadata(
+        self,
+        override=True,
+        target_path=os.path.join(
+            useful_paths.data_interim,
+            "esco",
+            "skills_metadata_en.csv",
+        ),
+        variable_selection=[
+            "conceptUri",
+            "preferredLabel",
+            "skillType",
+            "reuseLevel",
+            "skill_classification_esco"
+        ],
+    ):
         """
         Combine all skill-level metadata (SMD).
 
@@ -759,16 +1207,7 @@ class Esco(UsefulPaths):
             DataFrame containing the raw ESCO skills pillar data enriched by additional
             metadata (green labels, coreness).
         """
-
-        # output fpath
-        target_path = os.path.join(
-            self.data_interim,
-            "esco",
-            self.esco_version,
-            "skills_metadata_{}.csv".format(self.esco_language),
-        )
-
-        if self.skills_metadata is None:
+        if override or not os.path.exists(target_path):
             # -------------------------------------------------------------------------
             # Green Skills
             # -------------------------------------------------------------------------
@@ -815,7 +1254,7 @@ class Esco(UsefulPaths):
             )
 
             # TODO: repeat for eth data once skills are fully classified
-            # classify_neutral_skills(
+            # smd = classify_by_gbn(
             #     df=smd,
             #     col_name_green=self.green_id_colname_eth,
             #     col_name_brown=self.brown_id_colname_eth,
@@ -845,35 +1284,31 @@ class Esco(UsefulPaths):
                 validate="one_to_one",
             )
 
-            # optionally save for inspection
-            if export:
-                if fpath_out is None:
-                    fpath_out = target_path
-                smd.to_csv(fpath_out, sep=";")
+            # drop columns
+            if variable_selection is not None:
+                smd = smd[variable_selection]
 
+            # save for inspection
+            smd.to_csv(target_path, sep=";")
+
+        else:
+            smd = pd.read_csv(target_path)
             # assign
             self.skills_metadata = smd
 
         return smd
 
     # todo: implement weighted form of esco-based greenness measure
-    def calc_gbn_shares_skill_based(self, essential_only=False):
+    def calc_gbn_shares_skill_based(
+            self,
+            skills_metadata,
+            essential_only=False
+    ):
         # note: no weighting possible atm, just differentiation between essential and
         # optional skills
 
         # read
-        osms = self.occupation_skills_matrix()
-
-        # use essential skills only
-        if essential_only:
-            osm = osms["osm_weighted"]
-            osm[osm == self.config_data["ESCO"]["WEIGHT_OPTIONAL_SKILL"]] = 0
-        # use essential and optional skills (unweighted)
-        else:
-            osm = osms["osm_unweighted"]
-
-        if self.skills_metadata is None:
-            self.combine_skills_metadata()
+        osm = self.read_occ_skills_matrix(return_version="unweighted")
 
         # number of occupation-specific skills
         n_total_specific_skills = osm.sum(axis=1).values
@@ -893,8 +1328,7 @@ class Esco(UsefulPaths):
 
                 # number of occupation-specific green/brown/neutral skills
                 specific_skills = (
-                    osm.values
-                    * self.skills_metadata[col].astype(np.int8).values
+                    osm.values * skills_metadata[col].astype(np.int8).values
                 )
 
                 n_gbn_specific_skills = specific_skills.sum(axis=1)
@@ -910,9 +1344,7 @@ class Esco(UsefulPaths):
                 data_out[colname_shares] = occ_share
                 colnames.append(colname_shares)
 
-        df_occ_shares_per_skill_type = pd.DataFrame(
-            index=osm.index, data=data_out
-        )
+        df_occ_shares_per_skill_type = pd.DataFrame(index=osm.index, data=data_out)
 
         # check if shares sum to 100%
         check_sum_of_shares = df_occ_shares_per_skill_type[colnames].sum(axis=1).values
@@ -951,9 +1383,7 @@ class Esco(UsefulPaths):
         )
 
         greenness_onet_vona = pd.read_excel(
-            io=os.path.join(
-                self.data_raw, "onet", "Vona2018_table_a1.xlsx"
-            ),
+            io=os.path.join(self.data_raw, "onet", "Vona2018_table_a1.xlsx"),
             sheet_name="Greenness",
         )
 
@@ -1007,9 +1437,7 @@ class Esco(UsefulPaths):
 
         """
         brown_occs_vona2018 = pd.read_csv(
-            os.path.join(
-                self.data_raw, "onet", "Vona2018_brown_occupations.csv"
-            )
+            os.path.join(self.data_raw, "onet", "Vona2018_brown_occupations.csv")
         )
 
         # pad to 8 digits
@@ -1093,8 +1521,8 @@ class Esco(UsefulPaths):
 
             # pad at 4d level
             top_level = 4
-            omd[self.fmt_string_isco_lvl.format(top_level)] = (
-                omd["iscoGroup"].str.pad(width=top_level, side="left", fillchar="0")
+            omd[self.fmt_string_isco_lvl.format(top_level)] = omd["iscoGroup"].str.pad(
+                width=top_level, side="left", fillchar="0"
             )
 
             # decompose isco 4-digit into lower levels
@@ -1108,8 +1536,9 @@ class Esco(UsefulPaths):
             for lvl in [1, 2, 3, 4]:
                 omd = omd.merge(
                     left_on=self.fmt_string_isco_lvl.format(lvl),
-                    right=df_isco.loc[:, ("isco_code",
-                                          self.fmt_string_isco_label.format(lvl))],
+                    right=df_isco.loc[
+                        :, ("isco_code", self.fmt_string_isco_label.format(lvl))
+                    ],
                     right_on="isco_code",
                 ).drop(columns=["isco_code"])
 
@@ -1284,8 +1713,9 @@ class Esco(UsefulPaths):
 
             # aggregate
             if not use_weights:
-                occ_grouped = self.occupation_metadata.groupby([group_var_1, group_var_2
-                                                                ]).agg(agg_dict)
+                occ_grouped = self.occupation_metadata.groupby(
+                    [group_var_1, group_var_2]
+                ).agg(agg_dict)
             else:
                 raise NotImplementedError("TODO: implement weighted aggregation")
 
@@ -1353,4 +1783,3 @@ if __name__ == "__main__":
     # ESCO
     esco = Esco()
     print(esco.esco_language)
-
