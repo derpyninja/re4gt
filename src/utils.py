@@ -60,6 +60,11 @@ class UsefulPaths:
                     setattr(self, k_new, v_new)
 
 
+def sort_columns(df):
+    cols_sorted = df.columns.sort_values().values
+    return df[cols_sorted]
+
+
 def load_config(config_filepath):
     """
     Load yaml configuration file.
