@@ -2,6 +2,7 @@ import os
 import logging
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 from tqdm import tqdm
 
 import src
@@ -1186,7 +1187,7 @@ class Esco(UsefulPaths):
             "preferredLabel",
             "skillType",
             "reuseLevel",
-            "skill_classification_esco"
+            "skill_classification_esco",
         ],
     ):
         """
@@ -1299,11 +1300,7 @@ class Esco(UsefulPaths):
         return smd
 
     # todo: implement weighted form of esco-based greenness measure
-    def calc_gbn_shares_skill_based(
-            self,
-            skills_metadata,
-            essential_only=False
-    ):
+    def calc_gbn_shares_skill_based(self, skills_metadata, essential_only=False):
         # note: no weighting possible atm, just differentiation between essential and
         # optional skills
 
@@ -1751,6 +1748,72 @@ class Esco(UsefulPaths):
         #     df_out = pd.read_pickle(target_fpath_pkl)
 
         return df_out
+
+
+class Classifications(UsefulPaths):
+    def __init__(self):
+        # inherit class storing useful paths
+        UsefulPaths.__init__(self=self)
+
+        self._nace = None
+        self._nace_1d = None
+        self._nuts_3035 = None
+        self._nuts_4326 = None
+        self._isco = None
+
+    @property
+    def nace(self):
+        if self._nace is None:
+            self._nace = pd.read_csv(
+                os.path.join(
+                    self.data_raw, "classifications", "NACE_REV2_20210618_112431.csv"
+                )
+            )
+        return self._nace
+
+    @property
+    def nace_1d(self):
+        if self._nace_1d is None:
+            self._nace_1d = pd.read_csv(
+                os.path.join(
+                    self.data_raw, "classifications", "NACE_REV2_1d_section_codes.csv"
+                ),
+                delimiter=";",
+            )
+        return self._nace_1d
+
+    def read_nace_at_level(self, level=1):
+        return self.nace.loc[self.nace["Level"] == level]
+
+    @property
+    def nuts_3035(self):
+        if self._nuts_3035 is None:
+            self._nuts_3035 = gpd.read_file(
+                os.path.join(self.data_raw, "geodata", "NUTS_RG_03M_2021_3035.shp")
+            )
+        return self._nuts_3035
+
+    @property
+    def nuts_4326(self):
+        if self._nuts_4326 is None:
+            self._nuts_4326 = gpd.read_file(
+                os.path.join(self.data_raw, "geodata", "NUTS_RG_03M_2021_4326.shp")
+            )
+        return self._nuts_4326
+
+    @property
+    def isco(self):
+        if self._isco is None:
+            self._isco = pd.read_csv(
+                os.path.join(
+                    self.data_raw,
+                    "esco",
+                    "v1.1.0",
+                    "ISCOGroups_en.csv",
+                ),
+                dtype={"code": "str"},
+            )
+        return self._isco
 
 
 def classify_by_gbn(
