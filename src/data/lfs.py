@@ -719,12 +719,52 @@ class EuLfs(UsefulPaths):
             n_digits_isco=3,
             input_fname="eu_lfs_merged_{year}_with_covariates",
             optional_input_dir=None,
-            calc_relative_shares=True,
+            div_agg_vars_by="COEFF",
             save_file=True,
             output_fname="eulfs_{year}_by_{by}",
+            output_dirname="eulfs",
             optional_output_dir=None,
-
     ):
+        """
+        Aggregate merged LFS data by a single or several variables. Can flexibly cater
+        to aggregating employment shares by industry, occupation or region.
+
+        Parameters
+        ----------
+        year : str/int
+            Year identifier. E.g., 2019 for the year 2019.
+        group_by : str or list of str
+            Variables by which the data set should be grouped before aggregating.
+        agg_dict : dict
+            Dictionary of variable - aggregation function pairs. Only variables
+            included in this dict will be aggregated.
+            Example: {"COEFF": np.sum}
+        n_digits_isco : int
+            Restrict to those observations coded at specified number of ISCO-08 digits.
+            Defaults to 3 digits, which excludes Bulgaria, Malta and Poland, as well as
+            filters out weird ISCO codes 100, 110 (mainly occurring for NL). As a rule,
+            no ISCO 3D code should end with a 0!
+        input_fname : str
+            File name of data set. Formatting string needs to include a 'year' formatter.
+        optional_input_dir : str
+            Optionally override default folder.
+        div_agg_vars_by : str (defaults to "COEFF")
+            Optionally divide all aggregated variables by given variable. Defaults to
+            COEFF, thus yielding relative employment shares at the aggregated level.
+        save_file : Boolean
+            If True, data is saved to default or specified output dir + fname.
+        output_fname : str
+            Formatting string needs to include a 'year' formatter.
+        output_dirname : str
+            Default folder name.
+        optional_output_dir : str
+            Override the default output directory.
+
+        Returns
+        -------
+        df_agg : pd.DataFrame
+            Aggregated data set.
+        """
         df = self.read_merged_file(
             year=year,
             input_fname=input_fname,
@@ -740,10 +780,10 @@ class EuLfs(UsefulPaths):
         )
 
         # calculate relative employment shares at aggregated level
-        if calc_relative_shares:
+        if div_agg_vars_by is not None:
             for col in list(agg_dict.keys()):
                 df_agg["{}_rel".format(col)] = (
-                    df_agg[col] / df_agg["COEFF"]
+                    df_agg[col] / df_agg[div_agg_vars_by]
                 )
 
         # optionally save
@@ -753,7 +793,9 @@ class EuLfs(UsefulPaths):
             if optional_output_dir is not None:
                 output_dir = optional_output_dir
             else:
-                output_dir = self.path_eulfs_processed
+                output_dir = os.path.join(self.data_processed, output_dirname)
+
+            utils.ccdir(output_dir)
 
             # build grouping id for fname
             if isinstance(group_by, list):
@@ -1051,7 +1093,11 @@ class EulfsDs(LmData, Esco):
 
 
 if __name__ == "__main__":
+    from src.data.framework import Classifications, Onet
+
+    # load data classes
     classifications = Classifications()
+    onet_data = Onet()
 
     # load config file of EU-LFS data
     config = utils.load_config(
@@ -1077,13 +1123,8 @@ if __name__ == "__main__":
     #     )
     # )
     #
-    # covariates_by_nace = pd.read_csv(
-    #     os.path.join(
-    #         useful_paths.data_raw, "classifications", "NACE_REV2_1d_section_codes.csv"
-    #     ),
-    #     delimiter=";"
-    # )
-    #
+    covariates_by_nace = classifications.nace_1d
+
     # lfs.join_covariates(
     #     year=2019,
     #     optional_input_dir=config["paths"]["interim"],
@@ -1096,23 +1137,20 @@ if __name__ == "__main__":
     # )
 
     # join gilli 2020 greenness scores to merged file
-    greenness_gilli_2020 = pd.read_excel(
-        os.path.join(useful_paths.data_raw, "onet", "Gilli2020_AppC_Greenness_ISCO3D.xlsx"),
-        dtype={"ISCO_code": "str"}
-    )
-
-    lfs.join_covariates(
-        year=2019,
-        optional_input_dir=config["paths"]["interim"],
-        input_fname_lfs="eu_lfs_merged_{year}_with_covariates",
-        covariates_by_isco=greenness_gilli_2020,
-        isco_join_col_eulfs="ISCO",
-        isco_join_col_covariates="ISCO_code",
-        covariates_by_nace=None,
-        optional_output_dir=config["paths"]["interim"],
-        output_fname_lfs="eu_lfs_merged_{year}_with_covariates",
-        isco_covariate_selection=None,
-    )
+    # greenness_gilli_2020 = onet_data.green_occupations_gilli2020
+    #
+    # lfs.join_covariates(
+    #     year=2019,
+    #     optional_input_dir=config["paths"]["interim"],
+    #     input_fname_lfs="eu_lfs_merged_{year}_with_covariates",
+    #     covariates_by_isco=greenness_gilli_2020,
+    #     isco_join_col_eulfs="ISCO",
+    #     isco_join_col_covariates="ISCO_code",
+    #     covariates_by_nace=None,
+    #     optional_output_dir=config["paths"]["interim"],
+    #     output_fname_lfs="eu_lfs_merged_{year}_with_covariates",
+    #     isco_covariate_selection=None,
+    # )
 
     # aggregate
     agg_dict = {

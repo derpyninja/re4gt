@@ -282,6 +282,8 @@ class Onet(UsefulPaths):
         self._green_occupations_vona2018 = None
         self._green_occupations_narrow_jrc = None
 
+        self._green_occupations_gilli2020 = None
+
         self._brown_occupations_vona2018 = None
 
     @property
@@ -342,6 +344,23 @@ class Onet(UsefulPaths):
                 sheet_name="Greenness",
             )
         return self._green_occupations_vona2018
+
+    @property
+    def green_occupations_gilli2020(self):
+        """
+        Greenness scores from Gilli et al. (2018).
+        ISCO 3-digit level, 127 occupations.
+
+        Returns
+        -------
+
+        """
+        if self._green_occupations_gilli2020 is None:
+            self._green_occupations_gilli2020 = pd.read_excel(
+                os.path.join(useful_paths.data_raw, "onet", "Gilli2020_AppC_Greenness_ISCO3D.xlsx"),
+                dtype={"ISCO_code": "str"}
+            )
+        return self._green_occupations_gilli2020
 
     @property
     def brown_occupations_vona2018(self):
@@ -1507,7 +1526,7 @@ class Esco(UsefulPaths):
 
         return df_isco
 
-    def combine_occupation_metadata(self, export=True, fpath_out=None):
+    def combine_occupation_metadata(self, skills_metadata, export=True, fpath_out=None):
         # target fpath
         output_dir = os.path.join(self.data_interim, "esco", self.esco_version)
         fname_no_ext = "occ_metadata_{}".format(self.esco_language)
@@ -1550,8 +1569,12 @@ class Esco(UsefulPaths):
             # )
 
             # Read data sets
-            df_gbn_shares_esco_all = self.calc_gbn_shares_skill_based()
+            df_gbn_shares_esco_all = self.calc_gbn_shares_skill_based(
+                skills_metadata=skills_metadata
+            )
+
             df_gbn_shares_esco_ess = self.calc_gbn_shares_skill_based(
+                skills_metadata=skills_metadata,
                 essential_only=True
             )
             df_greenness_onet_esco = self.read_greenness_task_based()

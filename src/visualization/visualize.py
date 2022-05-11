@@ -7,11 +7,28 @@ import logging
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from src import utils
+from src import UsefulPaths, utils
 from src.data.lfs import EulfsDs, EuLfs
+from src.data.framework import Classifications
+
+useful_paths = UsefulPaths()
 
 
-
+def eulfs_maps(
+        year,
+        input_file=os.path.join(
+            useful_paths.data_processed, "eulfs", "eulfs_{}_by_NUTS_ID_NACE1D_label.pkl"
+        ),
+        out_dir=os.path.join(useful_paths.results_dir, "eulfs"),
+        slice_by_industry=False,
+        figsize=(10, 10),
+        legend=True,
+        vmin=0,
+        cbar_label="Employment fraction [-]",
+):
+    # read input data
+    df = pd.read_pickle(input_file.format(year))
+    print(df)
 
 
 class EulfsVis(EulfsDs):
