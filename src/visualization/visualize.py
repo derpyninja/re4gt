@@ -10,8 +10,43 @@ import matplotlib.pyplot as plt
 from src import UsefulPaths, utils
 from src.data.lfs import EulfsDs, EuLfs
 from src.data.framework import Classifications
+from src.stats_utils import correlation_matrix
 
 useful_paths = UsefulPaths()
+
+
+def correlation_matrix_plot(
+    df, significance_level=0.05, cbar_levels=8, figsize=(6, 6)
+):
+    """Plot corrmat considering p-vals."""
+    corr, pvals = correlation_matrix(df)
+
+    # create triangular mask for heatmap
+    mask = np.zeros_like(corr)
+    mask[np.triu_indices_from(mask)] = True
+
+    # mask corrs based on p-values
+    pvals_plot = np.where(pvals > significance_level, np.nan, corr)
+
+    # plot
+    # -------------------------------------------------------------------------
+    # define correct cbar height and pass to sns.heatmap function
+    fig, ax = plt.subplots(figsize=figsize)
+    cbar_kws = {"fraction": 0.046, "pad": 0.04}
+    sns.heatmap(
+        corr,
+        mask=mask,
+        cmap=sns.diverging_palette(20, 220, n=cbar_levels),
+        square=True,
+        vmin=-1,
+        center=0,
+        vmax=1,
+        annot=pvals_plot,
+        cbar_kws=cbar_kws,
+    )
+    plt.title("p < {:.3f}".format(significance_level))
+    plt.tight_layout()
+    return fig, ax
 
 
 def eulfs_maps(

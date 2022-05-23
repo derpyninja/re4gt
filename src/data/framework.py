@@ -25,6 +25,7 @@ class Crosswalks(UsefulPaths):
         self._onet_soc10 = None
 
         self._soc10_isco08_ibs = None
+        self._soc10_isco08_bls = None
         self._onet_isco08_jrc = None
 
         self._esco_de_kldb2010 = None
@@ -122,6 +123,8 @@ class Crosswalks(UsefulPaths):
         Crosswalk from 839 6-digit SOC-2010 to 436 4-digit ISCO-08 occupations from the
         Institute for Structural Research - IBS.
 
+        Note: this is actually the same crosswalk as the offical BLS SOC10-ISCO-08 one!
+
         Returns
         -------
 
@@ -136,6 +139,57 @@ class Crosswalks(UsefulPaths):
                 )
             )
         return self._soc10_isco08_ibs
+
+    def soc10_isco08_bls(self, direction="soc_to_isco", select_cols=True, rename=True):
+        """
+        Official crosswalk from 878 6-digit SOC-2010 to 441 4-digit ISCO-08 occupations
+        from the US BLS. August 2012 version with a June 2015 Update, downloaded from
+        the Nesta project repository.
+
+        Returns
+        -------
+
+        """
+        header = 6
+
+        direction_dict = {
+            "soc_to_isco": "2010 SOC to ISCO-08",
+            "isco_to_soc": "ISCO-08 to 2010 SOC"
+        }
+        sheet_name = direction_dict[direction]
+
+        rename_dict = {
+            "2010 SOC Code": "soc10_code",
+            "2010 SOC Title": "soc10_title",
+            "ISCO-08 Code": "isco08_code",
+            "ISCO-08 Title EN": "isco08_title"
+        }
+
+        col_sel = list(rename_dict.keys())
+
+        dtypes = {
+            "ISCO-08 Code": str
+        }
+
+        if self._soc10_isco08_bls is None:
+            self._soc10_isco08_bls = pd.read_excel(
+                os.path.join(
+                    useful_paths.data_raw,
+                    "crosswalks",
+                    "isco_soc_crosswalk.xls",
+                ),
+                sheet_name=sheet_name,
+                header=header,
+                dtype=dtypes,
+            )
+
+            if select_cols:
+                self._soc10_isco08_bls = self._soc10_isco08_bls[col_sel]
+
+            if rename:
+                self._soc10_isco08_bls = self._soc10_isco08_bls.rename(columns=rename_dict)
+
+        return self._soc10_isco08_bls
 
     @property
     def onet_isco08_jrc(self):
@@ -266,8 +320,8 @@ class Onet(UsefulPaths):
 
         self._green_occupations_gtp = None
         self._green_occupations_vona2018 = None
+        self._green_occupations_vona2019 = None
         self._green_occupations_narrow_jrc = None
-
         self._green_occupations_gilli2020 = None
 
         self._brown_occupations_vona2018 = None
@@ -330,6 +384,40 @@ class Onet(UsefulPaths):
                 sheet_name="Greenness",
             )
         return self._green_occupations_vona2018
+
+    def green_occupations_vona2019(self, agg_to_6d_soc=True):
+        """
+        Greenness scores from Vona et al. (2019) at SOC 6-digit level.
+
+        For rule book (average, zero, value from single occupation
+        group) for aggregation from 142 unique SOC 6-to 8-digit level occupations to
+        40 unique 6 digit occupations see online appendix of paper.
+
+        Returns
+        -------
+
+        """
+        if self._green_occupations_vona2019 is None:
+            self._green_occupations_vona2019 = pd.read_excel(
+                io=os.path.join(self.data_raw, "onet", "Vona2019_Greenness_6D_SOC.xlsx"),
+            )
+
+            if agg_to_6d_soc:
+                grouping_var = "soc10_6d_code"
+                # note: all 8D occupations within a 6D group have the same score,
+                # so either "first" or np.mean works well
+                agg_dict = {"share_green_vona2019_6d": np.mean}
+                self._green_occupations_vona2019 = \
+                    self._green_occupations_vona2019.groupby(grouping_var).aggregate(
+                        agg_dict).reset_index()
+
+                # rename
+                self._green_occupations_vona2019 = \
+                    self._green_occupations_vona2019.rename(
+                        columns={"share_green_vona2019_6d": "share_green_vona2019"}
+                    )
+
+        return self._green_occupations_vona2019
 
     @property
     def green_occupations_gilli2020(self):

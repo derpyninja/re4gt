@@ -1,0 +1,2 @@
+,X,Y,method,alternative,n,r,CI95%,p-unc,BF10,power
+0,share_brown_esco,share_brown_esco_ess,pearson,two-sided,426,0.9144409476075388,[0.9  0.93],1.1479668514637105e-168,3.698e+164,1.0

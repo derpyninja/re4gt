@@ -60,6 +60,14 @@ class UsefulPaths:
                     setattr(self, k_new, v_new)
 
 
+def extract_cols_by_kw(df, char_seq, invert_selection=False):
+    col_sel = df.columns.str.contains(char_seq)
+    if invert_selection:
+        col_sel = ~col_sel
+    cols_to_retain = df.columns[col_sel]
+    return df[cols_to_retain]
+
+
 def sort_columns(df):
     cols_sorted = df.columns.sort_values().values
     return df[cols_sorted]
