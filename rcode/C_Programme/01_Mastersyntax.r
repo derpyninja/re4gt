@@ -67,7 +67,7 @@ rm(list=ls())
 
 # Arbeitsumgebung bestimmen (siehe oben)
 
-FDZ=1 
+FDZ=0
 
 
 # Anmerkung zur Definition der Arbeitsumgebung: 
@@ -79,16 +79,18 @@ FDZ=1
 #	-------------------------------------------------------------------------------------------------------------------
 
 if (FDZ==0)  {
-  datenpfad    <- "<eigener Arbeitsplatz Daten>" # hier liegt z.B. das Datenstrukturfile
-  syntaxpfad   <- "<eigener Arbeitsplatz Programm>" # hier sollen Programme gespeichert werden
-  outputpfad   <- "<eigener Arbeitsplatz Ergebnisse>" # hier sollen alle Ergebnisse (inkl. log-file) gespeichert werden
-  neudatenpfad <- "<eigener Arbeitsplatz Arbeitsdateien>" # hier sollen neu erstellte Datensätze gespeichert werden
+  basispfad    <- "T:/Documents/Projects/04_jrc_green-skills-regional/03_data-analysis/re4gt/rcode"
+  datenpfad    <- file.path(basispfad, "A_Mikrodaten") # hier liegt z.B. das Datenstrukturfile
+  metadatenpfad<- file.path(basispfad, "B_Metadaten")
+  syntaxpfad   <- file.path(basispfad, "C_Programme") # hier sollen Programme gespeichert werden
+  outputpfad   <- file.path(basispfad, "D_Ergebnisse") # hier sollen alle Ergebnisse (inkl. log-file) gespeichert werden
+  neudatenpfad <- file.path(basispfad, "D_Ergebnisse") # hier sollen neu erstellte Datensätze gespeichert werden
 
-  dateiname    <- "Name des Datensatzes einfügen" # z.B. Name des Datenstrukturfiles einfügen
+  dateiname    <- "DSF_MZ 2019" # z.B. Name des Datenstrukturfiles einfügen
   outputname   <- "Name der Logdatei einfügen" # Name des log-files einfügen
-  syntaxname   <- "Name der Auswertungssyntax einfügen" # Name der Auswertungssyntax einfügen, die aus dem Masterprogramm gestartet werden soll
+  syntaxname   <- "02_Deskriptive_Analysen" # Name der Auswertungssyntax einfügen, die aus dem Masterprogramm gestartet werden soll
   
-  .libPaths("<eigener Arbeitsplatz R-Pakete>") # hier werden die benötigten R-Pakete lokal abgespeichert
+  #.libPaths("<eigener Arbeitsplatz R-Pakete>") # hier werden die benötigten R-Pakete lokal abgespeichert
 }
 
 #	Arbeitsumgebung 1: Pfadangaben für die Arbeit über die KDFV (Hinweis: die für Sie relevanten Pfade werden Ihnen in einer E-Mail bei Nutzungsbeginn mitgeteilt)
@@ -111,10 +113,11 @@ if (FDZ==1) {
 #	-------------------------------------------------------------------------------------------------------------------
 
 if (FDZ==2) {
-  datenpfad    <- file.path("Z:", "SMS", "GWA92_4561_FZ", "A_Mikrodaten") # hier liegen die Originaldaten
-  syntaxpfad   <- file.path("Z:", "SMS", "GWA92_4561_FZ", "C_Programme") # hier sollen Programme gespeichert werden
-  outputpfad   <- file.path("Z:", "SMS", "GWA92_4561_FZ", "D_Ergebnisse") # hier sollen alle Ergebnisse (inkl. log-file) gespeichert werden
-  neudatenpfad <- file.path("Z:", "SMS", "GWA92_4561_FZ", "D_Ergebnisse") # hier sollen neu erstellte Datensätze gespeichert werden
+  basispfad    <- file.path("Z:", "SMS", "GWA92_4561_FZ")
+  datenpfad    <- file.path(basispfad, "A_Mikrodaten") # hier liegen die Originaldaten
+  syntaxpfad   <- file.path(basispfad, "C_Programme") # hier sollen Programme gespeichert werden
+  outputpfad   <- file.path(basispfad, "D_Ergebnisse") # hier sollen alle Ergebnisse (inkl. log-file) gespeichert werden
+  neudatenpfad <- file.path(basispfad, "D_Ergebnisse") # hier sollen neu erstellte Datensätze gespeichert werden
   
   dateiname    <- "MZ 2019 (mit Labels BY_Pseudo).csv" # Name des Originaldatensatzes einfügen (siehe E-Mail)
   outputname   <- "Name der Logdatei einfügen" # Name des log-files einfügen
