@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def move_legend_to_right(ax, scale=0.8):
@@ -10,13 +11,15 @@ def move_legend_to_right(ax, scale=0.8):
     ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
 
-def move_legend_to_top(ax, scale=0.8, ncol=None):
+def move_legend_to_top(ax, scale=0.8, ncol=None, lower_anchor=0.5, upper_anchor=1.1):
     # Shrink current axis by 20%
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width, box.height * scale])
 
     # Put a legend to the top of the current axis
-    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.1), ncol=ncol)
+    ax.legend(
+        loc="upper center", bbox_to_anchor=(lower_anchor, upper_anchor), ncol=ncol
+    )
 
 
 # https://stackoverflow.com/questions/43214978/seaborn-barplot-displaying-values
@@ -40,3 +43,55 @@ def show_values_on_bars(axs, h_v="v", space=0.4, formatter="{:.2f}"):
             _show_on_single_plot(ax)
     else:
         _show_on_single_plot(axs)
+
+
+def plot_stackedbar_p(df, labels, colors, title, subtitle):
+    """
+    Source: https://towardsdatascience.com/stacked-bar-charts-with-pythons-matplotlib-f4020e4eb4a7
+
+    Parameters
+    ----------
+    df
+    labels
+    colors
+    title
+    subtitle
+
+    Returns
+    -------
+
+    """
+    fields = df.columns.tolist()
+
+    # figure and axis
+    fig, ax = plt.subplots(1, figsize=(12, 10))
+
+    # plot bars
+    left = len(df) * [0]
+    for idx, name in enumerate(fields):
+        plt.barh(df.index, df[name], left=left, color=colors[idx])
+        left = left + df[name]
+
+    # title and subtitle
+    plt.title(title, loc="left")
+    plt.text(0, ax.get_yticks()[-1] + 0.75, subtitle)
+
+    # legend
+    plt.legend(labels, bbox_to_anchor=([0.58, 1, 0, 0]), ncol=4, frameon=False)
+
+    # remove spines
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+
+    # format x ticks
+    xticks = np.arange(0, 1.1, 0.1)
+    xlabels = ["{}%".format(i) for i in np.arange(0, 101, 10)]
+    plt.xticks(xticks, xlabels)
+
+    # adjust limits and draw grid lines
+    plt.ylim(-0.5, ax.get_yticks()[-1] + 0.5)
+    ax.xaxis.grid(color="gray", linestyle="dashed")
+
+    plt.show()

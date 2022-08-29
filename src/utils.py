@@ -117,7 +117,9 @@ def get_set_diff(df_left, df_right, merge_col=None):
 
 
 def perc_missing(df):
-    return df.isna().sum() / df.shape[0]
+    abs = df.isna().sum()
+    rel = abs / df.shape[0]
+    return pd.DataFrame(data=[abs, rel], index=["abs", "rel"]).T
 
 
 def downcast_df(df, errors="ignore", downcast="integer"):

@@ -30,7 +30,7 @@
 
 # Speicher leeren
 
-rm(list=ls()) 
+rm(list=ls())
 
 # ggf. weiterführende Grundeinstellungen 
 
@@ -82,13 +82,13 @@ if (FDZ==0)  {
   basispfad    <- "T:/Documents/Projects/04_jrc_green-skills-regional/03_data-analysis/re4gt/rcode"
   datenpfad    <- file.path(basispfad, "A_Mikrodaten") # hier liegt z.B. das Datenstrukturfile
   metadatenpfad<- file.path(basispfad, "B_Metadaten")
-  syntaxpfad   <- file.path(basispfad, "C_Programme") # hier sollen Programme gespeichert werden
-  outputpfad   <- file.path(basispfad, "D_Ergebnisse") # hier sollen alle Ergebnisse (inkl. log-file) gespeichert werden
+  syntaxpfad   <- file.path(basispfad, "C_Programme", "2022-06-23 KDFV Hlawatsch") # hier sollen Programme gespeichert werden
+  outputpfad   <- file.path(basispfad, "D_Ergebnisse", "_OUTPUT_FINAL") # hier sollen alle Ergebnisse (inkl. log-file) gespeichert werden
   neudatenpfad <- file.path(basispfad, "D_Ergebnisse") # hier sollen neu erstellte Datensätze gespeichert werden
 
   dateiname    <- "DSF_MZ 2019" # z.B. Name des Datenstrukturfiles einfügen
-  outputname   <- "Name der Logdatei einfügen" # Name des log-files einfügen
-  syntaxname   <- "02_Deskriptive_Analysen" # Name der Auswertungssyntax einfügen, die aus dem Masterprogramm gestartet werden soll
+  outputname   <- "logfile" # Name des log-files einfügen
+  syntaxname   <- "02_Deskriptive_Analysen_v2" # Name der Auswertungssyntax einfügen, die aus dem Masterprogramm gestartet werden soll
   
   #.libPaths("<eigener Arbeitsplatz R-Pakete>") # hier werden die benötigten R-Pakete lokal abgespeichert
 }
@@ -121,7 +121,7 @@ if (FDZ==2) {
   
   dateiname    <- "MZ 2019 (mit Labels BY_Pseudo).csv" # Name des Originaldatensatzes einfügen (siehe E-Mail)
   outputname   <- "Name der Logdatei einfügen" # Name des log-files einfügen
-  syntaxname   <- "Name der Auswertungssyntax einfügen" # Name der Auswertungssyntax einfügen, die aus dem Masterprogramm gestartet werden soll
+  syntaxname   <- "02_Deskriptive_Analysen" # Name der Auswertungssyntax einfügen, die aus dem Masterprogramm gestartet werden soll
   
   .libPaths("R:/stata/ado") # hier werden die R-Pakete abgelegt
 }
@@ -131,7 +131,7 @@ if (FDZ==2) {
 # Aufrufen der Auswertungssyntax und Aufzeichnung im Protokoll starten
 #	-------------------------------------------------------------------------------------------------------------------
 
-sink(paste(outputpfad, "/", logdatei, ".log", sep=""), type = c("output", "message"), split = TRUE)
+sink(paste(outputpfad, "/", outputname, ".log", sep=""), type = c("output", "message"), split = TRUE)
 
 source(paste(syntaxpfad, "/", syntaxname, ".R", sep=""), echo = TRUE, max.deparse.length = 99999)
 

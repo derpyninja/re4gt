@@ -4,6 +4,30 @@ from scipy import stats
 from scipy.stats import kendalltau, pearsonr, spearmanr
 
 
+# correct if the population S.D. is expected to be equal for the two groups.
+def cohen_d(x, y):
+    """
+    Correct if the population S.D. is expected to be equal for the two groups.
+
+    Source: https://stackoverflow.com/questions/21532471/how-to-calculate-cohens-d-in-python
+    Parameters
+    ----------
+    x
+    y
+
+    Returns
+    -------
+
+    """
+    nx = len(x)
+    ny = len(y)
+    dof = nx + ny - 2
+    return (np.nanmean(x) - np.nanmean(y)) / np.sqrt(
+        ((nx - 1) * np.nanstd(x, ddof=1) ** 2 + (ny - 1) * np.nanstd(y, ddof=1) ** 2)
+        / dof
+    )
+
+
 def kendall_pval(x, y):
     return kendalltau(x, y)[1]
 

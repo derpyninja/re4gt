@@ -15,9 +15,7 @@ from src.stats_utils import correlation_matrix
 useful_paths = UsefulPaths()
 
 
-def correlation_matrix_plot(
-    df, significance_level=0.05, cbar_levels=8, figsize=(6, 6)
-):
+def correlation_matrix_plot(df, significance_level=0.05, cbar_levels=8, figsize=(6, 6)):
     """Plot corrmat considering p-vals."""
     corr, pvals = correlation_matrix(df)
 
@@ -50,22 +48,23 @@ def correlation_matrix_plot(
 
 
 def eulfs_maps(
-        year,
-        input_file=os.path.join(
-            useful_paths.data_processed, "eulfs", "eulfs_{}_by_NUTS_ID_NACE1D_label.pkl"
-        ),
-        out_dir=os.path.join(useful_paths.results_dir, "eulfs"),
-        slice_by_industry=False,
-        figsize=(10, 10),
-        legend=True,
-        vmin=0,
-        cbar_label="Employment fraction [-]",
+    year,
+    input_file=os.path.join(
+        useful_paths.data_processed, "eulfs", "eulfs_{}_by_NUTS_ID_NACE1D_label.pkl"
+    ),
+    out_dir=os.path.join(useful_paths.results_dir, "eulfs"),
+    slice_by_industry=False,
+    figsize=(10, 10),
+    legend=True,
+    vmin=0,
+    cbar_label="Employment fraction [-]",
 ):
     # read input data
     df = pd.read_pickle(input_file.format(year))
     print(df)
 
 
+# TODO: make data_panel assignable by path or similar (currently hardcoded)
 class EulfsVis(EulfsDs):
     """Class for visualising EU-LFS data."""
 
@@ -124,17 +123,16 @@ class EulfsVis(EulfsDs):
         self.cols_to_calc_all.insert(0, "COEFF")
 
         self.cols_to_aggregate = [
-            "COEFF_share_green_gtp_mean",
-            "COEFF_share_green_esco_mean",
-            "COEFF_share_brown_esco_mean",
-            "COEFF_share_neutral_esco_mean",
+            "COEFF",
+            "COEFF_share_green",
+            "COEFF_share_brown_sl",
+            "COEFF_share_brown_slt",
         ]
 
         self.cols_to_plot = [
-            "COEFF_share_green_gtp_mean_relative",
-            "COEFF_share_green_esco_mean_relative",
-            "COEFF_share_brown_esco_mean_relative",
-            "COEFF_share_neutral_esco_mean_relative",
+            "COEFF_share_green_rel",
+            "COEFF_share_brown_sl_rel",
+            "COEFF_share_brown_slt_rel",
         ]
 
     # todo: potentially move to new class in features submodule
@@ -160,10 +158,10 @@ class EulfsVis(EulfsDs):
         utils.ccdir(target_fdir)
 
         # get correct shapefile
-        # gdf_digits_match = self.gdf_nuts[epsg].loc[
-        #     self.gdf_nuts[epsg]["LEVL_CODE"] == self.n_digits_nuts
-        # ]
-        gdf_digits_match = self.gdf_nuts[epsg]
+        gdf_digits_match = self.gdf_nuts[epsg].loc[
+            self.gdf_nuts[epsg]["LEVL_CODE"] == self.n_digits_nuts
+        ]
+        # gdf_digits_match = self.gdf_nuts[epsg]
 
         # todo (!): move to visualisation instead of aggregation function
         # subset countries to plot
@@ -182,7 +180,7 @@ class EulfsVis(EulfsDs):
         )
 
         # combine
-        gdf_sub = pd.merge(df_all_agg, gdf_digits_match, on="NUTS_ID", how="left")
+        gdf_sub = pd.merge(gdf_digits_match, df_all_agg, on="NUTS_ID", how="left")
         gdf_sub = gpd.GeoDataFrame(gdf_sub, crs="EPSG:{}".format(self.epsg))
 
         # calculate relative shares at regional level
@@ -193,7 +191,7 @@ class EulfsVis(EulfsDs):
         # gdf_sub.to_file(target_fpath)
         return gdf_sub
 
-    def aggregate_by_industry(self):
+    def aggregate_by_industry(self, cols_to_aggregate=None):
         """
         Aggregate variables by NACE industrial sectors.
 
@@ -210,12 +208,12 @@ class EulfsVis(EulfsDs):
         # aggregate over industries and countries
         # todo: make more flexible to work with different NACE digit levels
         df_all_agg_by_cntr_ind = (
-            self.data_panel.groupby(["NACE1D_label", "COUNTRYW"])[self.cols_to_calc_all]
+            self.data_panel.groupby(["NACE1D_label", "COUNTRYW"])[cols_to_aggregate]
             .sum()
             .reset_index()
         )
 
-        for col in self.cols_to_aggregate:
+        for col in cols_to_aggregate:
             df_all_agg_by_cntr_ind["{}_relative".format(col)] = (
                 df_all_agg_by_cntr_ind[col] / df_all_agg_by_cntr_ind["COEFF"]
             )
@@ -265,13 +263,24 @@ class EulfsVis(EulfsDs):
         figsize=(10, 10),
         legend=True,
         vmin=0,
+        vmax=None,
+        cmap="Greys",
+        n_cats=None,
         cbar_label="Employment fraction [-]",
+        out_dir=os.path.join(
+            useful_paths.figure_dir,
+            "03_eulfs",
+            "2019",
+            "employment_shares_by_region",
+        ),
     ):
         """
         Create EU maps based on LFS data.
 
         Parameters
         ----------
+        out_dir
+        base_dir_name
         slice_by_industry
         figsize
         legend
@@ -286,8 +295,6 @@ class EulfsVis(EulfsDs):
         logger = logging.getLogger(__name__)
         logger.info("GBN employment shares by region.")
 
-        base_dir_name = "employment_shares_by_region"
-
         # read aggregated data
         if not slice_by_industry:
             # todo: should be read from an existing file
@@ -300,15 +307,23 @@ class EulfsVis(EulfsDs):
                 & gdf_sub.columns.str.endswith("relative")
             ].to_list()
 
-            dir_name = base_dir_name
             self.plot_map(
-                gdf_sub, cols_to_plot, dir_name, figsize, cbar_label, legend, vmin
+                gdf_sub=gdf_sub,
+                cols_to_plot=cols_to_plot,
+                out_dir=out_dir,
+                figsize=figsize,
+                cbar_label=cbar_label,
+                legend=legend,
+                vmin=vmin,
+                vmax=vmax,
+                cmap=cmap,
+                n_cats=n_cats,
             )
         else:
             industry_labels = self.df_nace.loc[:, "NACE1D_label"]
             for i, industry in enumerate(industry_labels):
                 print(industry)
-                dir_name = os.path.join(base_dir_name, "{}_{}".format(i, industry))
+                out_dir_industry = os.path.join(out_dir, "{}_{}".format(i, industry))
 
                 # subset by industry before aggregating by region
                 gdf_sub = self.aggregate_by_region(industry=industry)
@@ -321,13 +336,16 @@ class EulfsVis(EulfsDs):
                 ].to_list()
 
                 self.plot_map(
-                    gdf_sub,
-                    cols_to_plot,
-                    dir_name,
-                    figsize,
-                    cbar_label,
-                    legend,
-                    vmin,
+                    gdf_sub=gdf_sub,
+                    cols_to_plot=cols_to_plot,
+                    out_dir=out_dir_industry,
+                    figsize=figsize,
+                    cbar_label=cbar_label,
+                    legend=legend,
+                    vmin=vmin,
+                    vmax=vmax,
+                    cmap=cmap,
+                    n_cats=n_cats,
                     additional_title_info=industry,
                 )
         return None
@@ -336,11 +354,14 @@ class EulfsVis(EulfsDs):
         self,
         gdf_sub,
         cols_to_plot,
-        dir_name,
+        out_dir,
         figsize,
         cbar_label,
         legend,
         vmin,
+        vmax=None,
+        cmap="Greys",
+        n_cats=None,
         max_folder_name_length=50,
         additional_title_info=None,
     ):
@@ -351,14 +372,22 @@ class EulfsVis(EulfsDs):
 
         for column in cols_to_plot:
             print(column)
+
             # create figure
-            fig, ax = plt.subplots(figsize=figsize)
+            fig, ax = plt.subplots(figsize=(10, 10))
 
             # dynamically set n categories and vmax
             q_high, q_low = np.nanpercentile(gdf_sub[column].values, q=[p_high, p_low])
-            n_cats = np.ceil(q_high * 100)
+            n_cats_auto = np.ceil(q_high * 100)
             # vmax = np.ceil(gdf_sub[column].max() * 100) / 100
-            cmap = plt.get_cmap("Greys")
+
+            # optionally discretize cmap
+            if n_cats == "auto":
+                cmap = plt.get_cmap(cmap, n_cats_auto)
+            elif isinstance(n_cats, int):
+                cmap = plt.get_cmap(cmap, n_cats)
+            else:
+                cmap = plt.get_cmap(cmap)
 
             # plot data
             gdf_sub.plot(
@@ -367,8 +396,8 @@ class EulfsVis(EulfsDs):
                 figsize=figsize,
                 legend=legend,
                 cmap=cmap,
-                vmax=q_high,
-                vmin=vmin,
+                vmax=q_high if vmax is None else vmax,
+                vmin=q_low if vmin is None else vmin,
                 missing_kwds=self.missing_kwds,
                 legend_kwds=legend_kwds,
                 edgecolor=self.edgecolor,
@@ -393,21 +422,19 @@ class EulfsVis(EulfsDs):
             plt.tight_layout()
 
             # save
-            if len(dir_name) >= max_folder_name_length:
-                dir_name = dir_name[:max_folder_name_length]
+            # todo: needs a fix to save industry slices
+            split_path = out_dir.split(os.sep)
+            folder_name = split_path[-1]
+            if len(folder_name) >= max_folder_name_length:
+                folder_name_short = folder_name[:max_folder_name_length]
+                split_path[-1] = folder_name_short
+                out_dir = "{}".format(os.sep).join(split_path)
 
-            fpath_out_dir = os.path.join(
-                self.figure_dir,
-                "03_eulfs",
-                str(self.year),
-                dir_name,
-            )
-            utils.ccdir(fpath_out_dir)
-            print(fpath_out_dir)
+            utils.ccdir(out_dir)
 
             try:
                 plt.savefig(
-                    os.path.join(fpath_out_dir, "{}.png".format(column)),
+                    os.path.join(out_dir, "{}.png".format(column)),
                     dpi=150,
                     bbox_inches="tight",
                 )
@@ -419,19 +446,43 @@ class EulfsVis(EulfsDs):
             plt.close(fig)
         plt.close()
 
-    def create_industry_barplots(self):
+    def create_industry_barplots(
+        self,
+        year=2019,
+        cols_to_aggregate=None,
+        cols_to_plot=None,
+        x_lims=(0, 0.4),
+        out_dir=os.path.join(
+            useful_paths.figure_dir,
+            "03_eulfs",
+            "{year}",
+            "employment_shares_by_industry",
+        ),
+    ):
         logger = logging.getLogger(__name__)
         logger.info("GBN employment shares by industry.")
 
-        df_all_agg_by_cntr_ind = self.aggregate_by_industry()
+        # decide over variable selection
+        cols_to_aggregate = (
+            cols_to_aggregate
+            if cols_to_aggregate is not None
+            else self.cols_to_aggregate
+        )
+        cols_to_plot = cols_to_plot if cols_to_plot is not None else self.cols_to_plot
 
+        # aggregate
+        df_all_agg_by_cntr_ind = self.aggregate_by_industry(
+            cols_to_aggregate=cols_to_aggregate
+        )
+
+        # plot
         y_var = "NACE{}D_label".format(self.n_digits_nace)
         hue_var = "COUNTRYW"
 
         n_hue_colors = len(df_all_agg_by_cntr_ind[hue_var].unique())
         palette = sns.color_palette("cubehelix", n_colors=n_hue_colors)
 
-        for x_var in self.cols_to_plot:
+        for x_var in cols_to_plot:
             print("plotting variable: {}".format(x_var))
 
             # infer order (sorted by median in descending order)
@@ -470,6 +521,8 @@ class EulfsVis(EulfsDs):
             )
 
             # labelling
+            if x_lims is not None:
+                ax.set_xlim(x_lims)
 
             # Shrink current axis by x %
             shrinkage_factor = 0.2
@@ -480,18 +533,12 @@ class EulfsVis(EulfsDs):
 
             # Put a legend to the right of the current axis
             ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-
             ax.grid(axis="x", linestyle="--", zorder=0)
             ax.set_xlabel("{} ({})".format(x_var, self.year))
             sns.despine()
 
             # save
-            out_dir = os.path.join(
-                self.figure_dir,
-                "03_eulfs",
-                str(self.year),
-                "employment_shares_by_industry",
-            )
+            out_dir = out_dir.format(year=year)
             utils.ccdir(out_dir)
 
             plt.savefig(
@@ -502,6 +549,8 @@ class EulfsVis(EulfsDs):
 
             plt.close(fig)
 
+    # NOTE: occupations have the same GBN shares across countries, so this function does
+    #   not make a whole lot of sense
     def create_occupation_barplots(self, n_occ="all"):
         logger = logging.getLogger(__name__)
         logger.info("GBN employment shares by occupation.")
@@ -626,8 +675,9 @@ if __name__ == "__main__":
         year=2019,
     )
 
-    eulfs_visualiser.create_maps(slice_by_industry=True)
+    # eulfs_visualiser.create_maps(slice_by_industry=True)
+    eulfs_visualiser.create_industry_barplots()
+
     # eulfs_visualiser.create_occupation_barplots(n_occ="all")
     # eulfs_visualiser.create_occupation_barplots(n_occ=10)
     # eulfs_visualiser.create_occupation_barplots(n_occ=20)
-    # eulfs_visualiser.create_industry_barplots()

@@ -712,18 +712,18 @@ class EuLfs(UsefulPaths):
         return df_out
 
     def aggregate(
-            self,
-            year,
-            group_by,
-            agg_dict,
-            n_digits_isco=3,
-            input_fname="eu_lfs_merged_{year}_with_covariates",
-            optional_input_dir=None,
-            div_agg_vars_by="COEFF",
-            save_file=True,
-            output_fname="eulfs_{year}_by_{by}",
-            output_dirname="eulfs",
-            optional_output_dir=None,
+        self,
+        year,
+        group_by,
+        agg_dict,
+        n_digits_isco=3,
+        input_fname="eu_lfs_merged_{year}_with_covariates",
+        optional_input_dir=None,
+        div_agg_vars_by="COEFF",
+        save_file=True,
+        output_fname="eulfs_{year}_by_{by}",
+        output_dirname="eulfs",
+        optional_output_dir=None,
     ):
         """
         Aggregate merged LFS data by a single or several variables. Can flexibly cater
@@ -769,22 +769,16 @@ class EuLfs(UsefulPaths):
             year=year,
             input_fname=input_fname,
             optional_input_dir=optional_input_dir,
-            n_digits_isco=n_digits_isco
+            n_digits_isco=n_digits_isco,
         )
 
         # group by specified variables
-        df_agg = (
-            df.groupby(group_by)
-            .aggregate(agg_dict)
-            .reset_index()
-        )
+        df_agg = df.groupby(group_by).aggregate(agg_dict).reset_index()
 
         # calculate relative employment shares at aggregated level
         if div_agg_vars_by is not None:
             for col in list(agg_dict.keys()):
-                df_agg["{}_rel".format(col)] = (
-                    df_agg[col] / df_agg[div_agg_vars_by]
-                )
+                df_agg["{}_rel".format(col)] = df_agg[col] / df_agg[div_agg_vars_by]
 
         # optionally save
         if save_file:
@@ -1159,15 +1153,12 @@ if __name__ == "__main__":
         "COEFF_share_brown_esco_mean": np.sum,
         "COEFF_share_neutral_esco_mean": np.sum,
         "COEFF_share_green_gtp_mean": np.sum,
-        "COEFF_share_green_gilli2020": np.sum
+        "COEFF_share_green_gilli2020": np.sum,
     }
 
     # by 1-digit industry
     lfs.aggregate(
-        year=2019,
-        group_by=["NACE1D_label"],
-        agg_dict=agg_dict,
-        n_digits_isco=3
+        year=2019, group_by=["NACE1D_label"], agg_dict=agg_dict, n_digits_isco=3
     )
 
     # by 1-digit industry and country
@@ -1175,7 +1166,7 @@ if __name__ == "__main__":
         year=2019,
         group_by=["NACE1D_label", "COUNTRYW"],
         agg_dict=agg_dict,
-        n_digits_isco=3
+        n_digits_isco=3,
     )
 
     # by nuts-2 regions and 1-digit industries
@@ -1183,5 +1174,5 @@ if __name__ == "__main__":
         year=2019,
         group_by=["NUTS_ID", "NACE1D_label"],
         agg_dict=agg_dict,
-        n_digits_isco=3
+        n_digits_isco=3,
     )

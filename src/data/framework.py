@@ -62,7 +62,9 @@ class Crosswalks(UsefulPaths):
                 )
             )
             # create SOC 6-digit col
-            self._onet_esco_mcc_full["onet_code_6d"] = self._onet_esco_mcc_full["onet_code"].str[:7]
+            self._onet_esco_mcc_full["onet_code_6d"] = self._onet_esco_mcc_full[
+                "onet_code"
+            ].str[:7]
 
         return self._onet_esco_mcc_full
 
@@ -154,7 +156,7 @@ class Crosswalks(UsefulPaths):
 
         direction_dict = {
             "soc_to_isco": "2010 SOC to ISCO-08",
-            "isco_to_soc": "ISCO-08 to 2010 SOC"
+            "isco_to_soc": "ISCO-08 to 2010 SOC",
         }
         sheet_name = direction_dict[direction]
 
@@ -162,14 +164,12 @@ class Crosswalks(UsefulPaths):
             "2010 SOC Code": "soc10_code",
             "2010 SOC Title": "soc10_title",
             "ISCO-08 Code": "isco08_code",
-            "ISCO-08 Title EN": "isco08_title"
+            "ISCO-08 Title EN": "isco08_title",
         }
 
         col_sel = list(rename_dict.keys())
 
-        dtypes = {
-            "ISCO-08 Code": str
-        }
+        dtypes = {"ISCO-08 Code": str}
 
         if self._soc10_isco08_bls is None:
             self._soc10_isco08_bls = pd.read_excel(
@@ -187,7 +187,9 @@ class Crosswalks(UsefulPaths):
                 self._soc10_isco08_bls = self._soc10_isco08_bls[col_sel]
 
             if rename:
-                self._soc10_isco08_bls = self._soc10_isco08_bls.rename(columns=rename_dict)
+                self._soc10_isco08_bls = self._soc10_isco08_bls.rename(
+                    columns=rename_dict
+                )
 
         return self._soc10_isco08_bls
 
@@ -399,7 +401,9 @@ class Onet(UsefulPaths):
         """
         if self._green_occupations_vona2019 is None:
             self._green_occupations_vona2019 = pd.read_excel(
-                io=os.path.join(self.data_raw, "onet", "Vona2019_Greenness_6D_SOC.xlsx"),
+                io=os.path.join(
+                    self.data_raw, "onet", "Vona2019_Greenness_6D_SOC.xlsx"
+                ),
             )
 
             if agg_to_6d_soc:
@@ -407,15 +411,18 @@ class Onet(UsefulPaths):
                 # note: all 8D occupations within a 6D group have the same score,
                 # so either "first" or np.mean works well
                 agg_dict = {"share_green_vona2019_6d": np.mean}
-                self._green_occupations_vona2019 = \
-                    self._green_occupations_vona2019.groupby(grouping_var).aggregate(
-                        agg_dict).reset_index()
+                self._green_occupations_vona2019 = (
+                    self._green_occupations_vona2019.groupby(grouping_var)
+                    .aggregate(agg_dict)
+                    .reset_index()
+                )
 
                 # rename
-                self._green_occupations_vona2019 = \
+                self._green_occupations_vona2019 = (
                     self._green_occupations_vona2019.rename(
                         columns={"share_green_vona2019_6d": "share_green_vona2019"}
                     )
+                )
 
         return self._green_occupations_vona2019
 
@@ -431,8 +438,12 @@ class Onet(UsefulPaths):
         """
         if self._green_occupations_gilli2020 is None:
             self._green_occupations_gilli2020 = pd.read_excel(
-                os.path.join(useful_paths.data_raw, "onet", "Gilli2020_AppC_Greenness_ISCO3D.xlsx"),
-                dtype={"ISCO_code": "str"}
+                os.path.join(
+                    useful_paths.data_raw,
+                    "onet",
+                    "Gilli2020_AppC_Greenness_ISCO3D.xlsx",
+                ),
+                dtype={"ISCO_code": "str"},
             )
         return self._green_occupations_gilli2020
 
@@ -974,6 +985,7 @@ class Esco(UsefulPaths):
         osm.columns = self.skills["preferredLabel"].values
         return osm
 
+    # note: replaces function 'occupation_skills_matrix'
     def read_occ_skills_matrix(
         self,
         encoding_essential=1,
@@ -1271,10 +1283,7 @@ class Esco(UsefulPaths):
         self,
         override=True,
         export=True,
-        output_dir=os.path.join(
-            useful_paths.data_interim,
-            "esco"
-        ),
+        output_dir=os.path.join(useful_paths.data_interim, "esco"),
         output_fname="skills_metadata_en",
         variable_selection=None,
     ):
@@ -1398,7 +1407,9 @@ class Esco(UsefulPaths):
         return smd
 
     # todo: implement weighted form of esco-based greenness measure
-    def calc_gbn_shares_skill_based(self, skills_metadata, drop_counts=True, essential_only=False):
+    def calc_gbn_shares_skill_based(
+        self, skills_metadata, drop_counts=True, essential_only=False
+    ):
         # note: no weighting possible atm, just differentiation between essential and
         #  optional skills
 
@@ -1406,7 +1417,9 @@ class Esco(UsefulPaths):
         if not essential_only:
             osm = self.read_occ_skills_matrix(return_version="unweighted")
         else:
-            osm = self.read_occ_skills_matrix(return_version="weighted", weight_optional=0)
+            osm = self.read_occ_skills_matrix(
+                return_version="weighted", weight_optional=0
+            )
 
         # number of occupation-specific skills
         n_total_specific_skills = osm.sum(axis=1).values
@@ -1457,7 +1470,11 @@ class Esco(UsefulPaths):
 
         # drop skill type counts
         if drop_counts:
-            df_occ_shares_per_skill_type = df_occ_shares_per_skill_type.drop(columns=df_occ_shares_per_skill_type.columns[df_occ_shares_per_skill_type.columns.str.startswith("n")].values)
+            df_occ_shares_per_skill_type = df_occ_shares_per_skill_type.drop(
+                columns=df_occ_shares_per_skill_type.columns[
+                    df_occ_shares_per_skill_type.columns.str.startswith("n")
+                ].values
+            )
 
         # classify into discrete GBN categories
         # TODO: check if only one True per col.
@@ -1613,16 +1630,13 @@ class Esco(UsefulPaths):
         return df_isco
 
     def combine_occupation_metadata(
-            self,
-            skills_metadata,
-            override=True,
-            export=True,
-            variable_selection=None,
-            output_dir=os.path.join(
-                useful_paths.data_interim,
-                "esco"
-            ),
-            output_fname="occ_metadata_en",
+        self,
+        skills_metadata,
+        override=True,
+        export=True,
+        variable_selection=None,
+        output_dir=os.path.join(useful_paths.data_interim, "esco"),
+        output_fname="occ_metadata_en",
     ):
         # target fpath
         target_fpath = os.path.join(output_dir, output_fname + ".pkl")
@@ -1644,15 +1658,13 @@ class Esco(UsefulPaths):
             #     validate="1:1",
             # )
 
-
             # Read data sets
             df_gbn_shares_esco_all = self.calc_gbn_shares_skill_based(
                 skills_metadata=skills_metadata
             )
 
             df_gbn_shares_esco_ess = self.calc_gbn_shares_skill_based(
-                skills_metadata=skills_metadata,
-                essential_only=True
+                skills_metadata=skills_metadata, essential_only=True
             )
 
             # merge variables to occupation df
@@ -1770,9 +1782,9 @@ class Esco(UsefulPaths):
 
     def attach_isco_to_occupations(self, occupations, top_level=4):
         # pad at 4d level
-        occupations[self.fmt_string_isco_lvl.format(top_level)] = occupations["iscoGroup"].str.pad(
-            width=top_level, side="left", fillchar="0"
-        )
+        occupations[self.fmt_string_isco_lvl.format(top_level)] = occupations[
+            "iscoGroup"
+        ].str.pad(width=top_level, side="left", fillchar="0")
         # decompose isco 4-digit into lower levels
         for lvl in [1, 2, 3]:
             new_colname = self.fmt_string_isco_lvl.format(lvl)
@@ -1784,8 +1796,8 @@ class Esco(UsefulPaths):
             occupations = occupations.merge(
                 left_on=self.fmt_string_isco_lvl.format(lvl),
                 right=df_isco.loc[
-                      :, ("isco_code", self.fmt_string_isco_label.format(lvl))
-                      ],
+                    :, ("isco_code", self.fmt_string_isco_label.format(lvl))
+                ],
                 right_on="isco_code",
             ).drop(columns=["isco_code"])
 
@@ -1976,4 +1988,4 @@ if __name__ == "__main__":
     # combine skills metadata
     skill_var_sel = []
     smd = esco.combine_skills_metadata()
-    #esco.combine_occupation_metadata(skills_metadata=smd)
+    # esco.combine_occupation_metadata(skills_metadata=smd)

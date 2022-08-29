@@ -51,7 +51,7 @@ if __name__ == "__main__":
         year=2019,
     )
 
-    eulfs_visualiser.create_maps()
+    eulfs_visualiser.create_maps(base_dir_name=Target)
     # eulfs_visualiser.create_occupation_barplots(n_occ="all")
     # eulfs_visualiser.create_occupation_barplots(n_occ=10)
     # eulfs_visualiser.create_occupation_barplots(n_occ=20)
