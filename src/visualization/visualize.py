@@ -191,15 +191,17 @@ class EulfsVis(EulfsDs):
         # gdf_sub.to_file(target_fpath)
         return gdf_sub
 
-    def aggregate_by_industry(self, cols_to_aggregate=None):
+    def aggregate_by_industry(self, cols_to_aggregate=None, grouping=None):
         """
         Aggregate variables by NACE industrial sectors.
 
         Returns
         -------
-        df_all_agg_by_cntr_ind : pd.DataFrame
-            Variables aggregated by sector-country pairs.
+        df_all_agg_by_grouping : pd.DataFrame
+            Variables aggregated by grouping.
         """
+        if grouping is None:
+            grouping = ["NACE1D_label", "COUNTRYW"]
         target_fdir = os.path.join(self.path_eulfs_processed, "aggregated_by_industry")
         target_fname = "eulfs_vars_by_nace_{}_{}".format(self.n_digits_nace, self.year)
         utils.ccdir(target_fdir)
@@ -207,19 +209,17 @@ class EulfsVis(EulfsDs):
 
         # aggregate over industries and countries
         # todo: make more flexible to work with different NACE digit levels
-        df_all_agg_by_cntr_ind = (
-            self.data_panel.groupby(["NACE1D_label", "COUNTRYW"])[cols_to_aggregate]
-            .sum()
-            .reset_index()
+        df_all_agg_by_grouping = (
+            self.data_panel.groupby(grouping)[cols_to_aggregate].sum().reset_index()
         )
 
         for col in cols_to_aggregate:
-            df_all_agg_by_cntr_ind["{}_relative".format(col)] = (
-                df_all_agg_by_cntr_ind[col] / df_all_agg_by_cntr_ind["COEFF"]
+            df_all_agg_by_grouping["{}_relative".format(col)] = (
+                df_all_agg_by_grouping[col] / df_all_agg_by_grouping["COEFF"]
             )
 
-        utils.save_df_to_files(df_all_agg_by_cntr_ind, target_fdir, target_fname)
-        return df_all_agg_by_cntr_ind
+        utils.save_df_to_files(df_all_agg_by_grouping, target_fdir, target_fname)
+        return df_all_agg_by_grouping
 
     def aggregate_by_occupation(self):
         """
@@ -446,9 +446,10 @@ class EulfsVis(EulfsDs):
             plt.close(fig)
         plt.close()
 
-    def create_industry_barplots(
+    def create_industry_boxplots(
         self,
         year=2019,
+        grouping=None,
         cols_to_aggregate=None,
         cols_to_plot=None,
         x_lims=(0, 0.4),
@@ -459,6 +460,7 @@ class EulfsVis(EulfsDs):
             "employment_shares_by_industry",
         ),
     ):
+
         logger = logging.getLogger(__name__)
         logger.info("GBN employment shares by industry.")
 
@@ -471,23 +473,30 @@ class EulfsVis(EulfsDs):
         cols_to_plot = cols_to_plot if cols_to_plot is not None else self.cols_to_plot
 
         # aggregate
-        df_all_agg_by_cntr_ind = self.aggregate_by_industry(
-            cols_to_aggregate=cols_to_aggregate
-        )
+        if grouping is None:
+            grouping = ["NACE1D_label", "COUNTRYW"]
+
+        if len(grouping) > 1:
+            df_plotting = self.aggregate_by_industry(
+                cols_to_aggregate=cols_to_aggregate, grouping=grouping
+            )
+        else:
+            df_plotting = self.data_panel
+
+            for col in cols_to_aggregate:
+                df_plotting["{}_relative".format(col)] = (
+                    df_plotting[col] / df_plotting["COEFF"]
+                )
 
         # plot
         y_var = "NACE{}D_label".format(self.n_digits_nace)
-        hue_var = "COUNTRYW"
-
-        n_hue_colors = len(df_all_agg_by_cntr_ind[hue_var].unique())
-        palette = sns.color_palette("cubehelix", n_colors=n_hue_colors)
 
         for x_var in cols_to_plot:
             print("plotting variable: {}".format(x_var))
 
             # infer order (sorted by median in descending order)
             plotting_order = (
-                df_all_agg_by_cntr_ind.loc[:, (y_var, x_var)]
+                df_plotting.loc[:, (y_var, x_var)]
                 .groupby(y_var)
                 .median()
                 .sort_values(by=x_var, ascending=False)
@@ -496,9 +505,9 @@ class EulfsVis(EulfsDs):
 
             # create plot
             fig, ax = plt.subplots(figsize=(20, 10))
-
+            print(df_plotting.info())
             sns.boxplot(
-                data=df_all_agg_by_cntr_ind,
+                data=df_plotting,
                 x=x_var,
                 y=y_var,
                 color=".5",
@@ -506,19 +515,25 @@ class EulfsVis(EulfsDs):
                 order=plotting_order,
             )
 
-            sns.scatterplot(
-                data=df_all_agg_by_cntr_ind.set_index([y_var, hue_var])
-                .reindex(plotting_order, level=0)
-                .reset_index(),
-                x=x_var,
-                y=y_var,
-                hue=hue_var,
-                style=hue_var,
-                palette=palette,
-                zorder=5,
-                edgecolor="black"
-                # order=plotting_order,
-            )
+            # if there is a second group variable, define as hue and overlay scatter
+            if len(grouping) > 1:
+                hue_var = grouping[1]
+                n_hue_colors = len(df_plotting[hue_var].unique())
+                palette = sns.color_palette("cubehelix", n_colors=n_hue_colors)
+
+                sns.scatterplot(
+                    data=df_plotting.set_index([y_var, hue_var])
+                    .reindex(plotting_order, level=0)
+                    .reset_index(),
+                    x=x_var,
+                    y=y_var,
+                    hue=hue_var,
+                    style=hue_var,
+                    palette=palette,
+                    zorder=5,
+                    edgecolor="black"
+                    # order=plotting_order,
+                )
 
             # labelling
             if x_lims is not None:
@@ -532,7 +547,8 @@ class EulfsVis(EulfsDs):
             )
 
             # Put a legend to the right of the current axis
-            ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+            if len(grouping) > 1:
+                ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
             ax.grid(axis="x", linestyle="--", zorder=0)
             ax.set_xlabel("{} ({})".format(x_var, self.year))
             sns.despine()
@@ -676,7 +692,7 @@ if __name__ == "__main__":
     )
 
     # eulfs_visualiser.create_maps(slice_by_industry=True)
-    eulfs_visualiser.create_industry_barplots()
+    eulfs_visualiser.create_industry_boxplots()
 
     # eulfs_visualiser.create_occupation_barplots(n_occ="all")
     # eulfs_visualiser.create_occupation_barplots(n_occ=10)

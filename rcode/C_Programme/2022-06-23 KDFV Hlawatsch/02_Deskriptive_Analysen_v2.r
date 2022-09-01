@@ -848,40 +848,52 @@ df_occ_dist_4d <- dfm %>%
   group_by(EF541) %>% 
   summarise(
     n_obs=sum(n_obs), 
-    EF952=sum(EF952),
+    EF952_sum=sum(EF952),
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
     share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_green_unwtd=mean(share_green),
+    share_brown_unwtd=mean(share_brown),
+    share_neutral_unwtd=mean(share_neutral)
     )
 
 df_occ_dist_3d <- dfm %>% 
   group_by(EF541UG1) %>% 
   summarise(
-    n_obs=sum(n_obs), 
-    EF952=sum(EF952),
+    n_obs=sum(n_obs),
+    EF952_sum=sum(EF952),
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
     share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_green_unwtd=mean(share_green),
+    share_brown_unwtd=mean(share_brown),
+    share_neutral_unwtd=mean(share_neutral)
   )
 
 df_occ_dist_2d <- dfm %>% 
   group_by(EF541UG2) %>% 
   summarise(
     n_obs=sum(n_obs),
-    EF952=sum(EF952),
+    EF952_sum=sum(EF952),
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
     share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_green_unwtd=mean(share_green),
+    share_brown_unwtd=mean(share_brown),
+    share_neutral_unwtd=mean(share_neutral)
   )
 
 df_occ_dist_1d <- dfm %>% 
   group_by(EF541UG3) %>% 
   summarise(
     n_obs=sum(n_obs),
-    EF952=sum(EF952),
+    EF952_sum=sum(EF952),
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
     share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_green_unwtd=mean(share_green),
+    share_brown_unwtd=mean(share_brown),
+    share_neutral_unwtd=mean(share_neutral)
   )
 
 # save
