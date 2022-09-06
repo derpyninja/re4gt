@@ -1103,6 +1103,7 @@ class Esco(UsefulPaths):
 
         return occ_skills_matrix_eo
 
+    # todo: make functional
     def _calc_osm_variants(self, occ_skills_matrix_eo):
         """
         Calculate weighted and return_unweighted forms from raw OSM.
@@ -1222,7 +1223,7 @@ class Esco(UsefulPaths):
 
         return self._calc_osm_variants(occ_skills_matrix_eo=occ_skills_matrix_eo)
 
-    def occupation_similarity_matrix(self):
+    def occupation_similarity_matrix(self, version="weighted", weight_optional=0.5):
         """
         Calculate weighted and return_unweighted forms of the co-occurrence occupation
         similarity matrix (OSIM).
@@ -1237,7 +1238,9 @@ class Esco(UsefulPaths):
         logger = logging.getLogger(__name__)
 
         # read base OSM and calculate variants
-        osm_dict = self.occupation_skills_matrix()
+        osm_dict = self.read_occ_skills_matrix(
+            version=version, weight_optional=weight_optional
+        )
 
         target_path_template = os.path.join(
             self.data_interim,
@@ -1887,6 +1890,107 @@ class Esco(UsefulPaths):
         #     df_out = pd.read_pickle(target_fpath_pkl)
 
         return df_out
+
+    # todo: implement reading weighted 3D shares
+    def read_gbn_classification(self, agg_to_isco_at_digit=None, version="unweighted"):
+
+        # ESCO-level
+        if agg_to_isco_at_digit is None and version == "unweighted":
+            # read final lists
+            df_sl = pd.read_csv(
+                os.path.join(
+                    self.data_processed,
+                    "esco",
+                    "esco_level_gbn_classification_short_lists.csv",
+                ),
+                index_col=0,
+            )
+
+            df_sl_tobi = pd.read_csv(
+                os.path.join(
+                    self.data_processed,
+                    "esco",
+                    "esco_level_gbn_classification_short_lists_tobi.csv",
+                ),
+                index_col=0,
+            )
+
+            # get esco-isco mapping
+            esco_to_isco = self.attach_isco_to_occupations(self.occupations)
+
+            # merge mapping to lists
+            df_sl_merged = df_sl.merge(
+                esco_to_isco, on="conceptUri", how="left"
+            ).rename(
+                columns={
+                    "gbn_classification_short_list": "classification",
+                    "preferredLabel_x": "preferredLabel",
+                }
+            )
+            df_sl_tobi_merged = df_sl_tobi.merge(
+                esco_to_isco, on="conceptUri", how="left"
+            ).rename(columns={"gbn_classification_short_list": "classification"})
+
+            # combine both list version
+            gbn_classification_merged = pd.merge(
+                df_sl_merged[
+                    [
+                        "conceptUri",
+                        "preferredLabel",
+                        "classification",
+                        "isco_level_4",
+                        "isco_level_3",
+                        "isco_level_2",
+                        "isco_level_1",
+                    ]
+                ],
+                df_sl_tobi_merged[["conceptUri", "classification"]],
+                on="conceptUri",
+                how="left",
+                suffixes=("_sl", "_slt"),
+            )
+
+            return gbn_classification_merged
+
+        # ISCO-level
+        elif agg_to_isco_at_digit is not None and version == "unweighted":
+            gbn_shares_no_wt = pd.read_pickle(
+                os.path.join(
+                    self.data_processed,
+                    "esco",
+                    "final_gbn_shares_by_isco_unweighted.pkl",
+                )
+            )
+
+            # select specified ISCO level
+            gbn_shares_no_wt_sl = gbn_shares_no_wt.query(
+                "isco_level == {} & list_version == 'short_list'".format(
+                    agg_to_isco_at_digit
+                )
+            )
+            gbn_shares_no_wt_slt = gbn_shares_no_wt.query(
+                "isco_level == {} & list_version == 'short_list_tobi'".format(
+                    agg_to_isco_at_digit
+                )
+            )
+
+            # combine both list version
+            gbn_shares_no_wt_isco = pd.merge(
+                gbn_shares_no_wt_sl[
+                    [
+                        "isco_code",
+                        "preferredLabel_isco",
+                        "share_green",
+                        "share_brown",
+                        "share_neutral",
+                    ]
+                ],
+                gbn_shares_no_wt_slt[["isco_code", "share_brown", "share_neutral"]],
+                on="isco_code",
+                how="left",
+                suffixes=("_sl", "_slt"),
+            )
+            return gbn_shares_no_wt_isco
 
 
 class Classifications(UsefulPaths):

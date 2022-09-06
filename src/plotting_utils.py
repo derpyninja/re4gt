@@ -1,5 +1,7 @@
+import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 
 
 def move_legend_to_right(ax, scale=0.8):
@@ -95,3 +97,26 @@ def plot_stackedbar_p(df, labels, colors, title, subtitle):
     ax.xaxis.grid(color="gray", linestyle="dashed")
 
     plt.show()
+
+
+def discrete_cmap_with_manual_colors(
+    cmap_type="Blues", n_classes=10, colour_replacements=None
+):
+    # default setting: replace color of first cbar segment with white
+    if colour_replacements is None:
+        colour_replacements = {0: "white"}
+
+    cmap = plt.get_cmap(cmap_type, n_classes)
+
+    # extract all colors from the cmap
+    cmaplist = [cmap(i) for i in range(cmap.N)]
+
+    # update with manual color changs
+    for k, v in colour_replacements.items():
+        cmaplist[k] = v
+
+    # create the new map
+    cmap_new = mpl.colors.LinearSegmentedColormap.from_list(
+        "Custom cmap", cmaplist, cmap.N
+    )
+    return cmap_new

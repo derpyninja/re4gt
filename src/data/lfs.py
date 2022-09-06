@@ -238,7 +238,7 @@ class EuLfs(UsefulPaths):
         """
         For a given country and year, filter the raw data set by employed persons within
         working age, select specified variables, code NaN values, parse dtypes, create
-        a column that holds ISCO-08 occupation codes across different granularity levels
+        a column that holds ISCO-08 occupation codes across different agg_to_isco_at_digit levels
         and optionally return filtering stats summarising the fraction of observations
         retained compared to the original file.
 
@@ -833,7 +833,7 @@ class LmData(UsefulPaths):
 
         # parametrise data paths
         # TODO: make reading industry & geo-data flexible with respect to the desired
-        #   granularity. Similar to ISCO data approach below.
+        #   agg_to_isco_at_digit. Similar to ISCO data approach below.
         self.path_clsf_isco08 = self.path_clsf_isco08.format(
             self.config_data["ESCO"]["VERSION_NEWEST"]
         )
