@@ -130,6 +130,6 @@ if __name__ == "__main__":
     sns.plotting_context("paper", font_scale=1)
 
     plot_occ_sim_matrix_ordered_by_isco(version="unweighted", despine=True,
-                                        cmap_type="viridis", n_classes=20)
+                                        cmap_type="Blues", n_classes=20)
     plot_occ_sim_matrix_ordered_by_isco(version="weighted", despine=True,
-                                        cmap_type="viridis", n_classes=20)
+                                        cmap_type="Blues", n_classes=20)

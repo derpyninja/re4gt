@@ -1950,7 +1950,7 @@ class Esco(UsefulPaths):
                 suffixes=("_sl", "_slt"),
             )
 
-            return gbn_classification_merged
+            return gbn_classification_merged.drop_duplicates().reset_index(drop=True)
 
         # ISCO-level
         elif agg_to_isco_at_digit is not None and version == "unweighted":

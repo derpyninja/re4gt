@@ -169,8 +169,8 @@ sep <- ","
 dec <- "."
 
 if (FDZ == 0){
-  sep = ";"
-  dec = ","
+  sep = ","
+  dec = "."
 }
 
 # read data
@@ -735,8 +735,8 @@ for (occ_list_version in occ_list_versions) {
     )
     
     # gender
-    ggplot(dfm, aes(x = EF46, y=EF952, fill = .data[[category_version]])) +
-      geom_col(position = "dodge") +
+    ggplot(dfm, aes(x = .data[[category_version]], fill = EF46, weight=EF952)) +
+      geom_bar(position = "dodge") +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       labs(x="Gender", y="Population [-] (EF952)") +
       scale_fill_manual(values = fill_colors)
@@ -747,8 +747,8 @@ for (occ_list_version in occ_list_versions) {
     )
     
     # education, 1
-    ggplot(dfm, aes(x = EF517, y=EF952, fill = .data[[category_version]])) +
-      geom_col(position = "dodge") +
+    ggplot(dfm, aes(x = EF517, fill = .data[[category_version]], weight=EF952)) +
+      geom_bar(position = "dodge") +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       labs(x="Education (EF517)", y="Population [-] (EF952)") +
       scale_fill_manual(values = fill_colors)
@@ -768,8 +768,8 @@ for (occ_list_version in occ_list_versions) {
     )
     
     # education, 2
-    ggplot(dfm, aes(x = EF540, y=EF952, fill = .data[[category_version]])) +
-      geom_col(position = "dodge") +
+    ggplot(dfm, aes(x = EF540, weight=EF952, fill = .data[[category_version]])) +
+      geom_bar(position = "dodge") +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       labs(x="Education (EF540)", y="Population [-] (EF952)") +
       scale_fill_manual(values = fill_colors)
@@ -789,8 +789,8 @@ for (occ_list_version in occ_list_versions) {
     )
     
     # income, personal
-    ggplot(dfm, aes(x = EF436, y=EF952, fill = .data[[category_version]])) +
-      geom_col(position = "dodge") +
+    ggplot(dfm, aes(x = EF436, weight=EF952, fill = .data[[category_version]])) +
+      geom_bar(position = "dodge") +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       labs(x="Income, personal [Euro/month] (EF436)", y="Population [-] (EF952)") +
       scale_fill_manual(values = fill_colors)
