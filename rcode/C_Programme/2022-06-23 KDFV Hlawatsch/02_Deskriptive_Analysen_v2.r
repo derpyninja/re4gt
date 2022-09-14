@@ -128,6 +128,10 @@ calc_boxplot_stat <- function(x) {
   return(stats)
 }
 
+weighted.sum <- function(x, w, na.rm = TRUE){
+  return(sum(x * w))
+}
+
 # -------------------------------------------------------------------------------------------------------------------
 #	1. Datenaufbereitung
 #	-------------------------------------------------------------------------------------------------------------------
@@ -169,8 +173,8 @@ sep <- ","
 dec <- "."
 
 if (FDZ == 0){
-  sep = ","
-  dec = "."
+  sep = ";"
+  dec = ","
 }
 
 # read data
@@ -224,6 +228,7 @@ dfs <- dfs %>%
   # bin age variable (for descriptive stats)
   mutate(EF44_bin10 = cut_width(EF44, width=10, boundary=0))
 
+
 # convert integer dtypes to factors based on codebook (for descriptive stats)
 dfs_factors <- vars_to_factors(dfs, codebook = codebook)
 
@@ -261,13 +266,13 @@ dff$n_obs = 1
 
 # variables for summary statistics
 vars_summary <- c("EF952", "EF46", "EF44", "EF44_bin10", "EF517", "EF540", "EF436", "EF436_num", "EF442", "EF442_num", "EF114UG4", "EF114UG3", "EF137UG1")
-summ <- c('notNA(x)', 'mean(x)',   'sd(x)', 'min(x)', 'pctile(x)[25]', 'pctile(x)[75]', 'max(x)', 'sum(x)')
-summ.names <- c("N", "Mean", "Std. Dev.",	"Min",	"Pctl. 25",	"Pctl. 75",	"Max", "Sum")
+summ <- c('notNA(x)', 'mean(x)',   'sd(x)', 'pctile(x)[25]', 'pctile(x)[75]', 'sum(x)')
+summ.names <- c("N", "Mean", "Std. Dev.",	"Pctl. 25",	"Pctl. 75", "Sum")
 
 # summary tables (+ export)
-sumtable(dfs_factors, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 3, out = "csv", file = file.path(outputpfad, "summary_statistics_raw.csv")) # unfiltered
-sumtable(dff2, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 3, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment.csv")) # filtered for active employment status
-sumtable(dff, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 3, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_nans_dropped.csv")) # observations with missing occ code dropped
+sumtable(dfs_factors, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_raw.csv")) # unfiltered
+sumtable(dff2, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment.csv")) # filtered for active employment status
+#sumtable(dff, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 3, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_nans_dropped.csv")) # observations with missing occ code dropped
 
 # Ausgabe der Restpopulation [OUTPUT AUSSCHLIESSLICH FÜR PRÜFZWECKE]
 # -----------------------------------------------------------------------------
@@ -279,8 +284,8 @@ dff2_rest <- dfs %>%
 dff_rest <- dff2_rest %>%
   drop_na(EF114)
 
-sumtable(dff2_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 3, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_rest.csv")) # filtered for active employment status
-sumtable(dff_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 3, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_nans_dropped_rest.csv")) # observations with missing occ code dropped
+sumtable(dff2_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_rest.csv")) # filtered for active employment status
+sumtable(dff_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_nans_dropped_rest.csv")) # observations with missing occ code dropped
 
 # -----------------------------------------------------------------------------
 # 1.2 Attachment of external data
@@ -678,22 +683,45 @@ for (occ_list_version in occ_list_versions) {
   # -----------------------------------------------------------------------------
   
   # params
-  vars_summary_class <- c("EF952", "EF46", "EF44", "EF44_bin10", "EF517", "EF540", "EF436", "EF436_num", "EF442", "EF442_num", "EF114UG4", "EF137UG1")
+  vars_summary_class <- c("EF952", "EF46", "EF44", "EF44_bin10", "EF517", "EF540", "EF436", "EF436_num", "EF442", "EF442_num", "EF114UG4")
   fill_colors <- c("green" = "darkgreen", "brown" = "brown", "neutral" = "darkgrey")
   category_versions <- c("category_abs", "category_rel")
+  
+  # params sumtable
+  groups.summ.wtd <- c('notNA(x)', 'weighted.mean(x, w = wts)', 'weighted.sd(x, w = wts)', 'weighted.sum(x, w = wts)')
+  groups.summ.names.wtd <- c("N", "Wt. Mean", "Wt. SD", "Wt. Sum")
+  
+  groups.summ <- c('notNA(x)', 'mean(x)', 'sd(x)', 'sum(x)')
+  groups.summ.names <- c("N", "Mean", "SD", "Sum")
+  
   
   for (category_version in category_versions){
     # summary tables incl. tests for significant differences btw groups
     # -------------------------------------------------------------------------
     
     sumtable(
-      dfm, vars = vars_summary_class, group = category_version, group.test = TRUE, group.weights = "EF952",
-      out = "csv", file = file.path(outputpfad, occ_list_version, paste0("weighted_summary_statistics_by_", category_version, ".csv")), digits = 3
+      dfm, 
+      vars = vars_summary_class, 
+      group = category_version, 
+      group.test = TRUE, 
+      group.weights = "EF952",
+      summ = groups.summ.wtd,
+      summ.names = groups.summ.names.wtd,
+      out = "csv", 
+      file = file.path(outputpfad, occ_list_version, paste0("weighted_summary_statistics_by_", category_version, ".csv")), 
+      digits = 5
     )
     
     sumtable(
-      dfm, vars = vars_summary_class, group = category_version, group.test = TRUE,
-      out = "csv", file = file.path(outputpfad, occ_list_version, paste0("summary_statistics_by_", category_version, ".csv")), digits = 3
+      dfm, 
+      vars = vars_summary_class, 
+      group = category_version, 
+      group.test = TRUE,
+      summ = groups.summ,
+      summ.names = groups.summ.names,
+      out = "csv", 
+      file = file.path(outputpfad, occ_list_version, paste0("summary_statistics_by_", category_version, ".csv")), 
+      digits = 5
     )
     
     # pairwise tests for diff between groups
