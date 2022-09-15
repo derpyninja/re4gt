@@ -794,6 +794,8 @@ class Esco(UsefulPaths):
                 ),
                 dtype={"code": "str"},
             )
+            # make sure to correct codes of military occupations
+            self._isco_groups["code"] = self._isco_groups["conceptUri"].str.split("/").apply(pd.Series).loc[:, 5].str.lstrip("C")
         return self._isco_groups
 
     @property

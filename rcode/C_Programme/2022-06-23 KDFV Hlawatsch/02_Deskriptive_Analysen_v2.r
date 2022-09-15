@@ -34,7 +34,7 @@ date()
 #    "EF114", "EF114UG1", "EF114UG2", "EF114UG3", "EF114UG4", # occupation
 #    "EF137", "EF137UG1", # industry
 #    "EF172", "EF175", # workplace characteristics
-#    "EF188", "EF189", "EF195", "EF564", # place of work
+#    "EF188", "EF189", "EF196", "EF564", # place of work
 #    "EF436", "EF442", # income
 #    "EF517", "EF540", "EF564", # education
 #    "EF951", "EF952", "EF953" # projection factors
@@ -157,15 +157,12 @@ vars = c(
   "EF541", "EF541UG1", "EF541UG2", "EF541UG3", # occupations (ISCO)
   "EF137", "EF137UG1", # industry
   "EF172", "EF175", # workplace characteristics
-  "EF188", "EF189", "EF195", "EF564", # place of work
+  "EF188", "EF189", "EF195", "EF564", "EF196", # place of work
   "EF436", "EF442", # income
   "EF517", "EF540", "EF564", # education
   "EF951", "EF952", "EF953" # projection factors
 )
 
-# filtering criteria
-# age_min <- 15
-# age_max <- 67
 # -----------------------------------------------------------------------------
 
 # specify csv format
@@ -325,6 +322,17 @@ for (occ_list_version in occ_list_versions) {
 
   # sort columns alphabetically
   dfm <- dfm[, order(colnames(dfm))]
+  
+  # create share columns based on rel & abs categorical classifications
+  # (follows the "binary first" logic we followed for the ESCO data)
+  dfm$share_green_cat_abs <- ifelse(dfm$category_abs == "green", 1, 0)
+  dfm$share_green_cat_rel <- ifelse(dfm$category_rel == "green", 1, 0)
+  
+  dfm$share_brown_cat_abs <- ifelse(dfm$category_abs == "brown", 1, 0)
+  dfm$share_brown_cat_rel <- ifelse(dfm$category_rel == "brown", 1, 0)
+  
+  dfm$share_neutral_cat_abs <- ifelse(dfm$category_abs == "neutral", 1, 0)
+  dfm$share_neutral_cat_rel <- ifelse(dfm$category_rel == "neutral", 1, 0)
 
   #	-------------------------------------------------------------------------------------------------------------------
   # 2. Datenauswertung
@@ -343,31 +351,6 @@ for (occ_list_version in occ_list_versions) {
   print(paste("Unique industries (2 digit): ", length(unique(dfm$EF137UG1))))
   print(paste("Unique regions (reg. anp.): ", length(unique(dfm$EF564))))
   print(paste("Unique regions (nuts II): ", length(unique(dfm$EF189))))
-
-  # -----------------------------------------------------------------------------
-  # 2.2) Aggregation of occupational Greenness shares by occupation
-  # -----------------------------------------------------------------------------
-  
-  # This is solely to understand how workers are distributed across the top
-  # occupations. No further analysis is envisioned.
-  
-  # EF952 by occupation (5-digit)
-  # -------------------------------------------------------------
-  # absolute values
-  EF952_by_EF114 <- dfm %>%
-    group_by(EF114, EF114_name_en) %>%
-    summarise(
-      n_obs=sum(n_obs),
-      EF952_sum=sum(EF952),
-      EF952_share_green_abs = sum(EF952 * share_green),
-      EF952_share_brown_abs = sum(EF952 * share_brown),
-      EF952_share_neutral_abs = sum(EF952 * share_neutral),
-      EF952_share_green_rel = sum(EF952 * share_green) / sum(EF952),
-      EF952_share_brown_rel = sum(EF952 * share_brown) / sum(EF952),
-      EF952_share_neutral_rel = sum(EF952 * share_neutral) / sum(EF952),
-    )
-  
-  write_csv(EF952_by_EF114, file=file.path(outputpfad, occ_list_version, "EF952_by_EF114.csv"))
   
   # -----------------------------------------------------------------------------
   # 2.3) Grouping of occupational shares by region
@@ -380,14 +363,24 @@ for (occ_list_version in occ_list_versions) {
   EF952_by_EF189 <- dfm %>%
     group_by(EF189) %>%
     summarise(
+      # pruefung
       n_obs=sum(n_obs),
       EF952_sum=sum(EF952),
-      EF952_share_green_abs = sum(EF952 * share_green),
-      EF952_share_brown_abs = sum(EF952 * share_brown),
-      EF952_share_neutral_abs = sum(EF952 * share_neutral),
-      EF952_share_green_rel = sum(EF952 * share_green) / sum(EF952),
-      EF952_share_brown_rel = sum(EF952 * share_brown) / sum(EF952),
-      EF952_share_neutral_rel = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # share-based
+      share_green = sum(EF952 * share_green) / sum(EF952),
+      share_brown = sum(EF952 * share_brown) / sum(EF952),
+      share_neutral = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # categorical (abs)
+      share_green_cat_abs=sum(EF952 * share_green_cat_abs) / sum(EF952),
+      share_brown_cat_abs=sum(EF952 * share_brown_cat_abs) / sum(EF952),
+      share_neutral_cat_abs=sum(EF952 * share_neutral_cat_abs) / sum(EF952),
+      
+      # categorical (rel)
+      share_green_cat_rel=sum(EF952 * share_green_cat_rel) / sum(EF952),
+      share_brown_cat_rel=sum(EF952 * share_brown_cat_rel) / sum(EF952),
+      share_neutral_cat_rel=sum(EF952 * share_neutral_cat_rel) / sum(EF952),
     )
   
   write_csv(EF952_by_EF189, file=file.path(outputpfad, occ_list_version, "EF952_by_EF189.csv"))
@@ -400,17 +393,56 @@ for (occ_list_version in occ_list_versions) {
   EF952_by_EF564 <- dfm %>%
     group_by(EF564) %>%
     summarise(
+      # pruefung
       n_obs=sum(n_obs),
       EF952_sum=sum(EF952),
-      EF952_share_green_abs = sum(EF952 * share_green),
-      EF952_share_brown_abs = sum(EF952 * share_brown),
-      EF952_share_neutral_abs = sum(EF952 * share_neutral),
-      EF952_share_green_rel = sum(EF952 * share_green) / sum(EF952),
-      EF952_share_brown_rel = sum(EF952 * share_brown) / sum(EF952),
-      EF952_share_neutral_rel = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # share-based
+      share_green = sum(EF952 * share_green) / sum(EF952),
+      share_brown = sum(EF952 * share_brown) / sum(EF952),
+      share_neutral = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # categorical (abs)
+      share_green_cat_abs=sum(EF952 * share_green_cat_abs) / sum(EF952),
+      share_brown_cat_abs=sum(EF952 * share_brown_cat_abs) / sum(EF952),
+      share_neutral_cat_abs=sum(EF952 * share_neutral_cat_abs) / sum(EF952),
+      
+      # categorical (rel)
+      share_green_cat_rel=sum(EF952 * share_green_cat_rel) / sum(EF952),
+      share_brown_cat_rel=sum(EF952 * share_brown_cat_rel) / sum(EF952),
+      share_neutral_cat_rel=sum(EF952 * share_neutral_cat_rel) / sum(EF952),
     )
   
   write_csv(EF952_by_EF564, file=file.path(outputpfad, occ_list_version, "EF952_by_EF564.csv"))
+  
+  # EF952 by EF196 (NUTS III)
+  # -----------------------------------------------------------------------------
+  
+  # relative values
+  EF952_by_EF196 <- dfm %>%
+    group_by(EF196) %>%
+    summarise(
+      # pruefung
+      n_obs=sum(n_obs),
+      EF952_sum=sum(EF952),
+      
+      # share-based
+      share_green = sum(EF952 * share_green) / sum(EF952),
+      share_brown = sum(EF952 * share_brown) / sum(EF952),
+      share_neutral = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # categorical (abs)
+      share_green_cat_abs=sum(EF952 * share_green_cat_abs) / sum(EF952),
+      share_brown_cat_abs=sum(EF952 * share_brown_cat_abs) / sum(EF952),
+      share_neutral_cat_abs=sum(EF952 * share_neutral_cat_abs) / sum(EF952),
+      
+      # categorical (rel)
+      share_green_cat_rel=sum(EF952 * share_green_cat_rel) / sum(EF952),
+      share_brown_cat_rel=sum(EF952 * share_brown_cat_rel) / sum(EF952),
+      share_neutral_cat_rel=sum(EF952 * share_neutral_cat_rel) / sum(EF952),
+    )
+  
+  write_csv(EF952_by_EF196, file=file.path(outputpfad, occ_list_version, "EF952_by_EF196.csv"))
   
   # -----------------------------------------------------------------------------
   # 2.4) Grouping of occupational shares by industry
@@ -423,14 +455,24 @@ for (occ_list_version in occ_list_versions) {
   EF952_by_EF137 <- dfm %>%
     group_by(EF137) %>%
     summarise(
+      # pruefung
       n_obs=sum(n_obs),
       EF952_sum=sum(EF952),
-      EF952_share_green_abs = sum(EF952 * share_green),
-      EF952_share_brown_abs = sum(EF952 * share_brown),
-      EF952_share_neutral_abs = sum(EF952 * share_neutral),
-      EF952_share_green_rel = sum(EF952 * share_green) / sum(EF952),
-      EF952_share_brown_rel = sum(EF952 * share_brown) / sum(EF952),
-      EF952_share_neutral_rel = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # share-based
+      share_green = sum(EF952 * share_green) / sum(EF952),
+      share_brown = sum(EF952 * share_brown) / sum(EF952),
+      share_neutral = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # categorical (abs)
+      share_green_cat_abs=sum(EF952 * share_green_cat_abs) / sum(EF952),
+      share_brown_cat_abs=sum(EF952 * share_brown_cat_abs) / sum(EF952),
+      share_neutral_cat_abs=sum(EF952 * share_neutral_cat_abs) / sum(EF952),
+      
+      # categorical (rel)
+      share_green_cat_rel=sum(EF952 * share_green_cat_rel) / sum(EF952),
+      share_brown_cat_rel=sum(EF952 * share_brown_cat_rel) / sum(EF952),
+      share_neutral_cat_rel=sum(EF952 * share_neutral_cat_rel) / sum(EF952),
     )
   
   write_csv(EF952_by_EF137, file=file.path(outputpfad, occ_list_version, "EF952_by_EF137.csv"))
@@ -442,14 +484,24 @@ for (occ_list_version in occ_list_versions) {
   EF952_by_EF137UG1 <- dfm %>%
     group_by(EF137UG1) %>%
     summarise(
+      # pruefung
       n_obs=sum(n_obs),
       EF952_sum=sum(EF952),
-      EF952_share_green_abs = sum(EF952 * share_green),
-      EF952_share_brown_abs = sum(EF952 * share_brown),
-      EF952_share_neutral_abs = sum(EF952 * share_neutral),
-      EF952_share_green_rel = sum(EF952 * share_green) / sum(EF952),
-      EF952_share_brown_rel = sum(EF952 * share_brown) / sum(EF952),
-      EF952_share_neutral_rel = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # share-based
+      share_green = sum(EF952 * share_green) / sum(EF952),
+      share_brown = sum(EF952 * share_brown) / sum(EF952),
+      share_neutral = sum(EF952 * share_neutral) / sum(EF952),
+      
+      # categorical (abs)
+      share_green_cat_abs=sum(EF952 * share_green_cat_abs) / sum(EF952),
+      share_brown_cat_abs=sum(EF952 * share_brown_cat_abs) / sum(EF952),
+      share_neutral_cat_abs=sum(EF952 * share_neutral_cat_abs) / sum(EF952),
+      
+      # categorical (rel)
+      share_green_cat_rel=sum(EF952 * share_green_cat_rel) / sum(EF952),
+      share_brown_cat_rel=sum(EF952 * share_brown_cat_rel) / sum(EF952),
+      share_neutral_cat_rel=sum(EF952 * share_neutral_cat_rel) / sum(EF952),
     )
   
   write_csv(EF952_by_EF137UG1, file=file.path(outputpfad, occ_list_version, "EF952_by_EF137UG1.csv"))
@@ -863,6 +915,10 @@ for (occ_list_version in occ_list_versions) {
       paste0(category_version, "_by_EF442_num.pdf"),
       path=file.path(outputpfad, occ_list_version)
     )
+    
+    # obtain weighted occ shares within ISCO groups based on categorical classification
+    
+    
   }
   
 }
@@ -871,57 +927,133 @@ for (occ_list_version in occ_list_versions) {
 # 2.4) Occupational shares at ISCO level weighted by KldB 5-digit occupation counts
 # -----------------------------------------------------------------------------
 
-# obtain weighted occ shares within ISCO groups
+# obtain weighted occ shares within ISCO groups based on ESCO-derived shares
 df_occ_dist_4d <- dfm %>% 
   group_by(EF541) %>% 
   summarise(
+    # prüfung
     n_obs=sum(n_obs), 
     EF952_sum=sum(EF952),
+    
+    # share-based
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
     share_green_unwtd=mean(share_green),
+    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
     share_brown_unwtd=mean(share_brown),
-    share_neutral_unwtd=mean(share_neutral)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_neutral_unwtd=mean(share_neutral),
+    
+    # categorical (abs)
+    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+    
+    # categorical (rel)
+    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
     )
 
 df_occ_dist_3d <- dfm %>% 
   group_by(EF541UG1) %>% 
   summarise(
-    n_obs=sum(n_obs),
+    # prüfung
+    n_obs=sum(n_obs), 
     EF952_sum=sum(EF952),
+    
+    # share-based
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
     share_green_unwtd=mean(share_green),
+    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
     share_brown_unwtd=mean(share_brown),
-    share_neutral_unwtd=mean(share_neutral)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_neutral_unwtd=mean(share_neutral),
+    
+    # categorical (abs)
+    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+    
+    # categorical (rel)
+    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
   )
 
 df_occ_dist_2d <- dfm %>% 
   group_by(EF541UG2) %>% 
   summarise(
-    n_obs=sum(n_obs),
+    # prüfung
+    n_obs=sum(n_obs), 
     EF952_sum=sum(EF952),
+    
+    # share-based
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
     share_green_unwtd=mean(share_green),
+    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
     share_brown_unwtd=mean(share_brown),
-    share_neutral_unwtd=mean(share_neutral)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_neutral_unwtd=mean(share_neutral),
+    
+    # categorical (abs)
+    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+    
+    # categorical (rel)
+    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
   )
 
 df_occ_dist_1d <- dfm %>% 
   group_by(EF541UG3) %>% 
   summarise(
-    n_obs=sum(n_obs),
+    # prüfung
+    n_obs=sum(n_obs), 
     EF952_sum=sum(EF952),
+    
+    # share-based
     share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
     share_green_unwtd=mean(share_green),
+    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
     share_brown_unwtd=mean(share_brown),
-    share_neutral_unwtd=mean(share_neutral)
+    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+    share_neutral_unwtd=mean(share_neutral),
+    
+    # categorical (abs)
+    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+    
+    # categorical (rel)
+    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
   )
 
 # save
