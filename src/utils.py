@@ -73,6 +73,10 @@ def sort_columns(df):
     return df[cols_sorted]
 
 
+def reverse_dict(d):
+    return {v: k for k, v in d.items()}
+
+
 def load_config(config_filepath):
     """
     Load yaml configuration file.

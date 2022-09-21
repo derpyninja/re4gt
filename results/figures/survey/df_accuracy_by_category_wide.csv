@@ -1,16 +1,16 @@
-,SurveyId,RecipientName,RecipientInstitution,RecipientEmail,Duration Classification Task (in min),AccuracyBrown,AccuracyGreen,AccuracyNeutral
-0,SV_08SzuShq3d0bTHE,Davide Consoli,INGENIO (CSIC-UPV),davide.consoli@ingenio.upv.es,3.670933333333333,0.8,0.7,0.3333333333333333
-30,SV_0Vuxf3vymniiKOO,Ulrich Scharf,SkillLab,u.scharf@skilllab.io,4.419983333333333,0.625,0.9,0.7777777777777778
-60,SV_0c97zs7xtCbhvr8,Matteo Sostero,"European Commission, Joint Research Centre",matteo.sostero@ec.europa.eu,9.559266666666666,0.7777777777777778,1.0,0.8
-90,SV_1ZcgN17YT4K4ckK,Abdelfeteh BITAT,European Commission,abdelfeteh.bitat@ec.europa.eu,4.064766666666667,0.375,0.8,0.8
-120,SV_3EJUuyWm4Ipj274,Giovanni Marin,University of Urbino Carlo Bo,giovanni.marin@uniurb.it,5.652116666666667,0.625,1.0,1.0
-150,SV_3Qnrn9FpJiti7yu,Federico Biagi,European Commission,Federico.BIAGI@ec.europa.eu,28.980866666666667,0.7777777777777778,0.8888888888888888,0.9
-180,SV_4YNE2rVWxk5pfzU,Madeline Tyson,RMI,mtyson@rmi.org,9.4066,0.125,0.6,1.0
-210,SV_6DSmFSXQBkWuzpI,Glenda Quintini,OECD,glenda.quintini@oecd.org,20.701616666666666,0.9,0.8888888888888888,0.8
-241,SV_7O0vzMVe4r4VEXQ,Simon Schmid,SkillLab,s.schmid@skilllab.io,4.245700000000001,0.3333333333333333,0.8,1.0
-270,SV_8AnGiDhFo6NHmuy,Marieke Vandeweyer,OECD,marieke.vandeweyer@oecd.org,9.866716666666665,0.1111111111111111,0.7,0.5
-300,SV_8B2nwzLWJJK012S,Markus Janser,"Institute for Employment Research (IAB) of the Federal Employment Agency, Germany",markus.janser@iab.de,16.042933333333334,0.4444444444444444,0.8,0.7
-330,SV_cCSLdXCxRXS6fPg,Nick Pesta,RMI,npesta@rmi.org,11.500649999999998,0.9,1.0,1.0
-360,SV_cCtPgQaYVhffBcy,Cath Sleeman,Nesta,cath.sleeman@nesta.org.uk,7.730649999999999,0.5714285714285714,1.0,0.8888888888888888
-391,SV_cYJ1zIqeMrFVaaW,David Popp,Syracuse University,dcpopp@syr.edu,6.311466666666667,0.375,0.9,0.9
-420,SV_eURBW8C8gggqXxs,Valeria Costantini,Roma Tre University,valeria.costantini@uniroma3.it,5.134133333333333,0.8,0.8,0.6666666666666666
+,SurveyId,RecipientName,RecipientInstitution,RecipientEmail,Duration Classification Task (in min),Q1.3_Page Submit (in min),Q2.4_Page Submit (in min),AccuracyBrown,AccuracyGreen,AccuracyNeutral
+0,SV_08SzuShq3d0bTHE,Davide Consoli,INGENIO (CSIC-UPV),davide.consoli@ingenio.upv.es,3.670933333333333,0.12075,0.44165,0.8,0.7,0.3333333333333333
+30,SV_0Vuxf3vymniiKOO,Ulrich Scharf,SkillLab,u.scharf@skilllab.io,4.419983333333333,0.06333333333333332,0.3500166666666667,0.625,0.9,0.7777777777777778
+60,SV_0c97zs7xtCbhvr8,Matteo Sostero,"European Commission, Joint Research Centre",matteo.sostero@ec.europa.eu,9.559266666666666,0.2526333333333333,0.5547666666666667,0.7777777777777778,1.0,0.8
+90,SV_1ZcgN17YT4K4ckK,Abdelfeteh BITAT,European Commission,abdelfeteh.bitat@ec.europa.eu,4.064766666666667,0.051866666666666665,0.36669999999999997,0.375,0.8,0.8
+120,SV_3EJUuyWm4Ipj274,Giovanni Marin,University of Urbino Carlo Bo,giovanni.marin@uniurb.it,5.652116666666667,3.1316166666666665,0.24960000000000002,0.625,1.0,1.0
+150,SV_3Qnrn9FpJiti7yu,Federico Biagi,European Commission,Federico.BIAGI@ec.europa.eu,28.980866666666667,1.1412499999999999,0.54455,0.7777777777777778,0.8888888888888888,0.9
+180,SV_4YNE2rVWxk5pfzU,Madeline Tyson,RMI,mtyson@rmi.org,9.4066,0.1039,0.18949999999999997,0.125,0.6,1.0
+210,SV_6DSmFSXQBkWuzpI,Glenda Quintini,OECD,glenda.quintini@oecd.org,20.701616666666666,21.872933333333332,0.5587833333333333,0.9,0.8888888888888888,0.8
+241,SV_7O0vzMVe4r4VEXQ,Simon Schmid,SkillLab,s.schmid@skilllab.io,4.245700000000001,0.1571,3.2971999999999997,0.3333333333333333,0.8,1.0
+270,SV_8AnGiDhFo6NHmuy,Marieke Vandeweyer,OECD,marieke.vandeweyer@oecd.org,9.866716666666665,1.4896500000000001,0.27696666666666664,0.1111111111111111,0.7,0.5
+300,SV_8B2nwzLWJJK012S,Markus Janser,"Institute for Employment Research (IAB) of the Federal Employment Agency, Germany",markus.janser@iab.de,16.042933333333334,5.462833333333333,0.9109,0.4444444444444444,0.8,0.7
+330,SV_cCSLdXCxRXS6fPg,Nick Pesta,RMI,npesta@rmi.org,11.500649999999998,1.0710833333333334,0.2782666666666667,0.9,1.0,1.0
+360,SV_cCtPgQaYVhffBcy,Cath Sleeman,Nesta,cath.sleeman@nesta.org.uk,7.730649999999999,0.9809,0.2717833333333333,0.5714285714285714,1.0,0.8888888888888888
+391,SV_cYJ1zIqeMrFVaaW,David Popp,Syracuse University,dcpopp@syr.edu,6.311466666666667,0.4640333333333333,0.27449999999999997,0.375,0.9,0.9
+420,SV_eURBW8C8gggqXxs,Valeria Costantini,Roma Tre University,valeria.costantini@uniroma3.it,5.134133333333333,0.4388666666666667,0.46033333333333337,0.8,0.8,0.6666666666666666

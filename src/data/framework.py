@@ -42,7 +42,7 @@ class Crosswalks(UsefulPaths):
 
         "Although we hopefully have O*NET matches for every ESCO
         occupation - not every O*NET occupation has been matched to an ESCO occupation.
-        The reason is because we wanted to use O*NET features in the context of
+        The reason is because we wanted to use O*NET modelling in the context of
         transitioning between European ESCO occupations - so it was enough to find the
         closest O*NET occupation for each ESCO occupation."
 
@@ -795,7 +795,13 @@ class Esco(UsefulPaths):
                 dtype={"code": "str"},
             )
             # make sure to correct codes of military occupations
-            self._isco_groups["code"] = self._isco_groups["conceptUri"].str.split("/").apply(pd.Series).loc[:, 5].str.lstrip("C")
+            self._isco_groups["code"] = (
+                self._isco_groups["conceptUri"]
+                .str.split("/")
+                .apply(pd.Series)
+                .loc[:, 5]
+                .str.lstrip("C")
+            )
         return self._isco_groups
 
     @property
@@ -1241,7 +1247,7 @@ class Esco(UsefulPaths):
 
         # read base OSM and calculate variants
         osm_dict = self.read_occ_skills_matrix(
-            version=version, weight_optional=weight_optional
+            return_version=version, weight_optional=weight_optional
         )
 
         target_path_template = os.path.join(

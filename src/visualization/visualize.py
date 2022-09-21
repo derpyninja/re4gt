@@ -135,7 +135,7 @@ class EulfsVis(EulfsDs):
             "COEFF_share_brown_slt_rel",
         ]
 
-    # todo: potentially move to new class in features submodule
+    # todo: potentially move to new class in modelling submodule
     def aggregate_by_region(self, industry=None, epsg="3035"):
         """
         Aggregate variables by NUTS regions.
