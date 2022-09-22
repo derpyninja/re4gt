@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import geopandas as gpd
+import pickle
 
 import seaborn as sns
 from matplotlib import colors
@@ -24,7 +25,9 @@ class ReskillingPathways:
     for EU-LFS labour force survey data.
     """
 
-    def __init__(self, osm_version="weighted", sim_metric="cooc", lfs_data=None):
+    def __init__(
+        self, osm_version="weighted", sim_metric="cooc", lfs_data=None, year=2019
+    ):
         """
 
         Parameters
@@ -45,6 +48,7 @@ class ReskillingPathways:
         self.osm_version = osm_version
         self.sim_metric = sim_metric
         self.lfs_data = lfs_data
+        self.year = year
 
         # phaseout scenario implementations
         self.phaseout_scenarios = ["coal", "brown_techchange", "brown"]
@@ -73,7 +77,15 @@ class ReskillingPathways:
         self.trans_thresh_pc_approach = None
 
         # desirable target categories
-        self.target_cats = {"neutral", "green"}
+        self.target_cats = ["neutral", "green"]
+
+        # phase-out scenario specific list version for assigning GBN categories
+        self.category_versions = {
+            # TODO: discuss categories for coal case
+            "coal": "category_sl",
+            "brown_techchange": "category_slt",
+            "brown": "category_sl",
+        }
 
         # OSM versions
         self.osm_versions = ["weighted", "unweighted"]
@@ -132,7 +144,7 @@ class ReskillingPathways:
             self.df_occ_sim.values.flatten(), q=(96, 99)
         )
 
-    def get_occs(self, level="isco_3_digit", lfs_subset=None):
+    def get_occs(self, level="isco_3_digit", lfs_country_subset=None):
         """
         Obtain list of occupations for given ISCO granularity level that are available in
         the occupation similarity matrix.
@@ -141,7 +153,7 @@ class ReskillingPathways:
         ----------
         level : str
             ISCO occupation granularity level. One of (isco_3_digit, isco_4_digit).
-        lfs_subset : pd.DataFrame
+        lfs_country_subset : pd.DataFrame
             Note: currently only works for ISCO 3D data
         Returns
         -------
@@ -167,32 +179,42 @@ class ReskillingPathways:
         )
 
         # optionally join country-level means from lfs data set
-        if lfs_subset is not None:
+        if lfs_country_subset is not None:
             agg_dict = {
-                "COEFF": np.nansum,
-                "INCDECIL": np.nanmedian,
                 "share_green": np.nanmean,
                 "share_brown_sl": np.nanmean,
                 "share_brown_slt": np.nanmean,
                 "share_neutral_sl": np.nanmean,
+                "share_neutral_slt": np.nanmean,
+                "INCDECIL_imputed": np.nanmedian,
                 "annual_earnings": np.nanmean,
             }
 
-            isco_avg = lfs_subset.groupby(["ISCO", "ISCO3D_label"]).aggregate(agg_dict)
+            isco_avg = lfs_country_subset.groupby(["ISCO", "ISCO3D_label"]).aggregate(
+                agg_dict
+            )
 
             # define the GBN category of an ISCO 3D group as the one with the
             # highest fraction (of ESCO occupations)
-            isco_avg["category"] = isco_avg[
+            isco_avg["category_sl"] = isco_avg[
                 ["share_green", "share_brown_sl", "share_neutral_sl"]
+            ].idxmax(axis=1)
+            isco_avg["category_slt"] = isco_avg[
+                ["share_green", "share_brown_slt", "share_neutral_slt"]
             ].idxmax(axis=1)
 
             isco_avg = isco_avg.replace(
                 to_replace={
-                    "category": {
+                    "category_sl": {
                         "share_green": "green",
                         "share_brown_sl": "brown",
                         "share_neutral_sl": "neutral",
-                    }
+                    },
+                    "category_slt": {
+                        "share_green": "green",
+                        "share_brown_slt": "brown",
+                        "share_neutral_slt": "neutral",
+                    },
                 }
             )
 
@@ -576,7 +598,17 @@ class ReskillingPathways:
             Subset of LFS data specific to scenario and country.
         """
         transition_pool = None
+
+        # subset LFS data
         lfs_data_country = self.lfs_data[self.lfs_data["COUNTRYW"] == country]
+
+        # get averages
+        isco_grp_avg = self.get_occs(
+            level="isco_3_digit", lfs_country_subset=lfs_data_country
+        )
+
+        # select all observations that are both within coal-specific occupations and
+        #  industries
         if scenario == "coal":
             occ_subset = lfs_data_country["ISCO3D_label"].isin(
                 list(self.coal_occupations.keys())
@@ -586,10 +618,22 @@ class ReskillingPathways:
             )
 
             transition_pool = lfs_data_country[occ_subset & ind_subset]
+
+        # select all observations which occupations are browner than the
+        # across-occupation average of the share_brown_slt variable
         elif scenario == "brown_techchange":
-            raise NotImplementedError()
+            transition_pool = lfs_data_country.loc[
+                lfs_data_country["share_brown_slt"]
+                > isco_grp_avg["share_brown_slt"].mean()
+            ]
+
+        # select all observations which occupations are browner than the
+        # across-occupation average of the share_brown_sl variable
         elif scenario == "brown":
-            raise NotImplementedError()
+            transition_pool = lfs_data_country.loc[
+                lfs_data_country["share_brown_sl"]
+                > isco_grp_avg["share_brown_sl"].mean()
+            ]
         else:
             raise NotImplementedError()
 
@@ -600,6 +644,7 @@ class ReskillingPathways:
         level="isco_3_digit",
         countries=None,
         scenarios=None,
+        transition_optimisation="wage",
         out_dir=os.path.join(useful_paths.figure_dir, "reskilling_simulation"),
     ):
         """
@@ -614,6 +659,9 @@ class ReskillingPathways:
             Countries to process.
         scenarios : list of str
             Phase-out scenarios to process.
+        transition_optimisation : str
+            Which variable to optimise in the simulation of occupation transitions.
+            Either 'wage' (minimise wage loss) or 'skill' (maximise skill overlap).
         out_dir : os.Path
             Path to output directory
 
@@ -637,6 +685,7 @@ class ReskillingPathways:
 
         # define transition thresholds
         q_viable, q_highly_viable = self.trans_thresh_pc_approach
+        print(q_viable, q_highly_viable)
 
         # -----------------------------------------------------------------------------
         # Scenario loop
@@ -646,6 +695,9 @@ class ReskillingPathways:
             print("scenario: {}".format(scenario))
             # select scenario-specific weighting coefficient
             coeff_weight = self.transition_pool_weights[scenario]
+
+            # scenario-specific categories of occupations
+            category_version = self.category_versions[scenario]
 
             # create results dir
             out_folder = "{}_occupations_by_{}".format(scenario, coeff_weight.lower())
@@ -663,9 +715,15 @@ class ReskillingPathways:
 
                 # read occupation list coherent with sim matrix and enriched by means
                 # across several LFS variables
-                df_occs = self.get_occs(level=level, lfs_subset=df_transition_pool)
+                df_occs = self.get_occs(
+                    level=level,
+                    lfs_country_subset=self.lfs_data[
+                        self.lfs_data["COUNTRYW"] == country
+                    ],
+                )
 
                 # populate transition pool dict
+                # todo: do i need this snippet?
                 transition_pool_dict = {}
                 for i, s in df_transition_pool.iterrows():
                     transition_pool_dict[s.ISCO3D_label] = s.ISCO3D
@@ -679,6 +737,12 @@ class ReskillingPathways:
                 # Worker-level transition simulation
                 # ---------------------------------------------------------------------
                 transition_number_data = []
+                print(
+                    "    transition pool: {} workers (n={})".format(
+                        df_transition_pool[coeff_weight].sum(),
+                        df_transition_pool.shape[0],
+                    )
+                )
                 for i, search_obs in tqdm(df_transition_pool.iterrows()):
                     search_label = search_obs.ISCO3D_label
                     idx = df_occs.loc[
@@ -691,10 +755,10 @@ class ReskillingPathways:
 
                     # filter: viable, green or neutral
                     target_occs_filtered = target_occs.loc[
-                        target_occs.similarity > q_viable
+                        target_occs["similarity"] > q_viable
                     ]
                     target_occs_filtered = target_occs_filtered.loc[
-                        target_occs_filtered.category != "brown"
+                        target_occs_filtered[category_version].isin(self.target_cats)
                     ]
                     target_occs_filtered = target_occs_filtered.dropna()
 
@@ -705,19 +769,27 @@ class ReskillingPathways:
                     )
 
                     # if I know the wage of the source occupation, choose transition
-                    # that minimises wage losses
-                    if search_obs["annual_earnings"] != np.nan:
-                        target = target_occs_filtered.sort_values("wage_diff").tail(1)
+                    # that minimises wage losses. else, choose transition with highest
+                    # target wage.
+                    if transition_optimisation == "wage":
+                        if search_obs["annual_earnings"] != np.nan:
+                            target = target_occs_filtered.sort_values("wage_diff").tail(
+                                1
+                            )
+                        else:
+                            target = target_occs_filtered.sort_values(
+                                "annual_earnings"
+                            ).tail(1)
+                    # choose occupation with highest skills overlap
+                    elif transition_optimisation == "skill":
+                        target = target_occs_filtered.sort_values("similarity").tail(1)
                     else:
-                        # if not, choose transition with highest target wage
-                        target = target_occs_filtered.sort_values(
-                            "annual_earnings"
-                        ).tail(1)
+                        raise NotImplementedError()
 
                     # check if viable transition exists
                     if not target.empty:
-                        # Every worker transitions to the next-closest job and I
-                        # evaluate the wage difference
+                        # Every worker transitions to target job based on switching
+                        # logic. We evaluate the wage difference.
                         search_obs["earnings_delta_closest_switch"] = (
                             target["annual_earnings"].values[0]
                             - search_obs["annual_earnings"]
@@ -736,7 +808,9 @@ class ReskillingPathways:
                         search_obs["transition_target"] = target[
                             "preferredLabel"
                         ].values[0]
-                        search_obs["target_category"] = target.category.values[0]
+                        search_obs["target_category"] = target[category_version].values[
+                            0
+                        ]
                     else:
                         # if no viable transition exists, I assume (FOR NOW), that the
                         # salary is lost entirely and has to be provided by the state
@@ -761,33 +835,25 @@ class ReskillingPathways:
                 df_transition_numbers = pd.concat(transition_number_data, axis=1).T
                 df_transition_numbers = df_transition_numbers.infer_objects()
 
-                # scale
+                # scale to mio
                 df_transition_numbers["earnings_delta_closest_switch_sum_mio"] = (
                     df_transition_numbers["earnings_delta_closest_switch_sum"] / 10**6
                 )
 
-                # ---------------------------------------------------------------------
-                # regional aggregation
-                # ---------------------------------------------------------------------
-                # Calculate avg number of transitions per threatened job
-                # df_transition_numbers_by_nuts = df_transition_numbers.groupby(
-                #     "NUTS_ID"
-                # ).sum()
-                # df_transition_numbers_by_nuts["n_viable_transitions_rel"] = (
-                #     df_transition_numbers_by_nuts.n_viable_transitions_sum
-                #     / df_transition_numbers_by_nuts[coeff_weight]
-                # )
-                #
-                # # to gdf
-                # gdf_transition_numbers_by_nuts = pd.merge(
-                #     self.gdf[self.gdf["CNTR_CODE"] == country],
-                #     df_transition_numbers_by_nuts.reset_index(),
-                #     on="NUTS_ID",
-                #     how="left",
-                # )
-
                 # store results
                 simulation_results[scenario] = {country: df_transition_numbers}
+
+        # save as pickle
+        dirname = "baseline_simulations_{}_optimisation_{}".format(
+            transition_optimisation, self.year
+        )
+        fname = "{}.pkl".format(dirname)
+
+        target_dir = os.path.join(out_dir, dirname)
+        utils.ccdir(target_dir)
+
+        with open(os.path.join(target_dir, fname), "wb") as handle:
+            pickle.dump(simulation_results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return simulation_results
 
@@ -799,6 +865,176 @@ class ReskillingPathways:
 
     def simulate_upskilling_regional(self):
         pass
+
+    def visualise_simulation_results(
+        self,
+        simulation_results=None,
+        base_dir=os.path.join(useful_paths.figure_dir, "reskilling_simulation"),
+        year=2019,
+        transition_optimisation="wage",
+    ):
+
+        # read file if no results are passed
+        if simulation_results is None:
+            # path of in-file
+            dirname = "baseline_simulations_{}_optimisation_{}".format(
+                transition_optimisation, year
+            )
+            fname = "{}.pkl".format(dirname)
+
+            # Load data (deserialize)
+            fpath = os.path.join(base_dir, dirname, fname)
+            with open(fpath, "rb") as handle:
+                simulation_results = pickle.load(handle)
+
+        # iterate over scenarios and countries
+        for scenario, country_results_dict in simulation_results.items():
+            print(scenario)
+            for country, df_transition_numbers in country_results_dict.items():
+                print(country)
+
+                # select scenario-specific weighting coefficient
+                coeff_weight = self.transition_pool_weights[scenario]
+
+                # ---------------------------------------------------------------------
+                # REGIONAL AGGREGATION
+                # ---------------------------------------------------------------------
+
+                # Calculate avg number of transitions per threatened job
+                df_transition_numbers_by_nuts = df_transition_numbers.groupby(
+                    "NUTS_ID"
+                ).sum()
+
+                df_transition_numbers_by_nuts["n_viable_transitions_rel"] = (
+                    df_transition_numbers_by_nuts.n_viable_transitions_sum
+                    / df_transition_numbers_by_nuts[coeff_weight]
+                )
+
+                # to gdf
+                gdf_transition_numbers_by_nuts = pd.merge(
+                    self.gdf[self.gdf["CNTR_CODE"] == country],
+                    df_transition_numbers_by_nuts.reset_index(),
+                    on="NUTS_ID",
+                    how="left",
+                )
+
+                # ---------------------------------------------------------------------
+                # REGIONAL PLOTS
+                # ---------------------------------------------------------------------
+                fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(20, 20))
+
+                cmap_earnings = plt.get_cmap("coolwarm_r", 8)
+                cmap_earnings.set_over("darkblue")
+                cmap_earnings.set_under("darkred")
+
+                # cmap_transitions = plotting_utils.discrete_cmap_with_manual_colors(cmap_type="Blues", n_classes=5)
+                cmap_transitions = plt.get_cmap("Blues", 10)
+                cmap_transitions.set_over("darkblue")
+
+                # upper limits for colorbars
+                vmax_transitions = 10  # n viable transitions
+                vmax_wages = 40  # million euro
+
+                # transition numbers
+                gdf_transition_numbers_by_nuts.plot(
+                    column="n_viable_transitions_rel",
+                    legend=True,
+                    cmap=cmap_transitions,
+                    vmin=0,
+                    vmax=vmax_transitions,
+                    legend_kwds={
+                        "label": "Transitions per at-risk worker [-]",
+                        "fraction": 0.03,
+                        "extend": "max",
+                    },
+                    missing_kwds={
+                        "facecolor": "lightgrey",
+                        "hatch": "/",
+                        "edgecolor": "grey",
+                    },
+                    edgecolor="grey",
+                    linewidth=0.5,
+                    ax=ax1,
+                )
+                gdf_transition_numbers_by_nuts.apply(
+                    lambda x: ax1.annotate(
+                        text=x.NUTS_NAME,
+                        xy=x.geometry.centroid.coords[0],
+                        ha="center",
+                        alpha=0.5,
+                        rotation=0,
+                        fontsize=8,
+                    ),
+                    axis=1,
+                )
+
+                ax1.set_title(
+                    "$\mu = {:.2f}$".format(
+                        gdf_transition_numbers_by_nuts.n_viable_transitions_rel.mean()
+                    )
+                )
+                ax1.axis("off")
+
+                # earnings losses
+                v = vmax_wages
+                gdf_transition_numbers_by_nuts.plot(
+                    column="earnings_delta_closest_switch_sum_mio",
+                    legend=True,
+                    cmap=cmap_earnings,
+                    vmin=-v,
+                    vmax=v,
+                    legend_kwds={
+                        "label": "Change in total annual earnings [M€ (2010)]",
+                        "fraction": 0.03,
+                        "extend": "both",
+                    },
+                    missing_kwds={
+                        "facecolor": "lightgrey",
+                        "hatch": "/",
+                        "edgecolor": "grey",
+                    },
+                    edgecolor="grey",
+                    linewidth=0.5,
+                    ax=ax2,
+                )
+
+                gdf_transition_numbers_by_nuts.apply(
+                    lambda x: ax2.annotate(
+                        text=x.NUTS_NAME,
+                        xy=x.geometry.centroid.coords[0],
+                        ha="center",
+                        alpha=0.5,
+                        rotation=0,
+                        fontsize=8,
+                    ),
+                    axis=1,
+                )
+
+                ax2.set_title(
+                    "$\mu = {:.2f}~M€~(2010)$".format(
+                        gdf_transition_numbers_by_nuts.earnings_delta_closest_switch_sum_mio.mean()
+                    )
+                )
+                ax2.axis("off")
+
+                # layout
+                fig.suptitle(
+                    "Scenario: {}, Country: {}, Year: {}".format(
+                        scenario.capitalize(), country, year
+                    )
+                )
+                fig.tight_layout()
+                fig.subplots_adjust(top=1.5)
+
+                plt.savefig(
+                    os.path.join(
+                        useful_paths.figure_dir,
+                        "reskilling_simulation",
+                        "n_transitions_by_region.png",
+                    ),
+                    dpi=300,
+                    bbox_inches="tight",
+                )
 
 
 if __name__ == "__main__":
@@ -818,39 +1054,18 @@ if __name__ == "__main__":
     )
     lfs = EuLfs(config=config)
 
-    df_all = lfs.read_preprocessed_file(
-        year=2019, input_fname_lfs="eu_lfs_merged_{year}_with_final_unweighted_shares"
-    )
-
-    df_all["INCDECIL"] = df_all["INCDECIL"].astype(float)
-    df_all = pd.merge(
-        df_all,
-        earnings_deciles,
-        left_on=["COUNTRYW", "INCDECIL"],
-        right_on=["country", "decile"],
-        how="left",
-    )
-
-    # define the GBN category of an ISCO 3D group as the one with the highest fraction (of ESCO occupations)
-    df_all["category"] = df_all[
-        ["share_green", "share_brown_sl", "share_neutral_sl"]
-    ].idxmax(axis=1)
-
-    df_all = df_all.replace(
-        to_replace={
-            "category": {
-                "share_green": "green",
-                "share_brown_sl": "brown",
-                "share_neutral_sl": "neutral",
-            }
-        }
+    lfs_data = lfs.read_preprocessed_file(
+        year=2019,
+        input_fname_lfs="eu_lfs_merged_{year}_with_final_unweighted_shares_and_earnings_incdecil_imputed",
     )
 
     # ---------------------------------------------------------------------
     # Simulate baseline for coal phase-out scenario in Germany
     # ---------------------------------------------------------------------
 
-    rp = ReskillingPathways(osm_version="weighted", sim_metric="cooc", lfs_data=df_all)
+    rp = ReskillingPathways(
+        osm_version="weighted", sim_metric="cooc", lfs_data=lfs_data, year=2019
+    )
     baseline_simulations = rp.simulate_baseline(
         level="isco_3_digit", countries=["DE"], scenarios=["coal"]
     )

@@ -123,7 +123,7 @@ def get_set_diff(df_left, df_right, merge_col=None):
 def perc_missing(df):
     abs = df.isna().sum()
     rel = abs / df.shape[0]
-    return pd.DataFrame(data=[abs, rel], index=["abs", "rel"]).T
+    return pd.DataFrame(data=[abs, rel], index=["missing_obs_abs", "missing_obs_rel"]).T
 
 
 def downcast_df(df, errors="ignore", downcast="integer"):

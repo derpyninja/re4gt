@@ -602,7 +602,7 @@ class EuLfs(UsefulPaths):
                 left_on=isco_join_col_eulfs,
                 right_on=isco_join_col_covariates,
                 how="left",
-            ).drop(columns=[isco_join_col_covariates])
+            )  # .drop(columns=[isco_join_col_covariates])
 
         if covariates_by_nace is not None:
             # optionally make selection of covariates to attach
