@@ -282,7 +282,7 @@ dff_rest <- dff2_rest %>%
   drop_na(EF114)
 
 sumtable(dff2_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_rest.csv")) # filtered for active employment status
-sumtable(dff_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_nans_dropped_rest.csv")) # observations with missing occ code dropped
+#sumtable(dff_rest, vars=vars_summary, summ=summ, summ.names=summ.names, digits = 5, out = "csv", file = file.path(outputpfad, "summary_statistics_active_employment_nans_dropped_rest.csv")) # observations with missing occ code dropped
 
 # -----------------------------------------------------------------------------
 # 1.2 Attachment of external data
@@ -351,6 +351,148 @@ for (occ_list_version in occ_list_versions) {
   print(paste("Unique industries (2 digit): ", length(unique(dfm$EF137UG1))))
   print(paste("Unique regions (reg. anp.): ", length(unique(dfm$EF564))))
   print(paste("Unique regions (nuts II): ", length(unique(dfm$EF189))))
+  
+  # -----------------------------------------------------------------------------
+  # 2.4) Occupational shares at ISCO level weighted by KldB 5-digit occupation counts
+  # -----------------------------------------------------------------------------
+  
+  # Note: share-based shares stay the same throughout the lists, but category-
+  # based shares will be different between SL and SLT
+  
+  # obtain weighted occ shares within ISCO groups based on ESCO-derived shares and based on categorical classification
+  df_occ_dist_4d <- dfm %>% 
+    group_by(EF541) %>% 
+    summarise(
+      # prüfung
+      n_obs=sum(n_obs), 
+      EF952_sum=sum(EF952),
+      
+      # share-based
+      share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
+      share_green_unwtd=mean(share_green),
+      share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
+      share_brown_unwtd=mean(share_brown),
+      share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+      share_neutral_unwtd=mean(share_neutral),
+      
+      # categorical (abs)
+      share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+      share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+      share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+      share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+      share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+      share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+      
+      # categorical (rel)
+      share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+      share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+      share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+      share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+      share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+      share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
+    )
+  
+  df_occ_dist_3d <- dfm %>% 
+    group_by(EF541UG1) %>% 
+    summarise(
+      # prüfung
+      n_obs=sum(n_obs), 
+      EF952_sum=sum(EF952),
+      
+      # share-based
+      share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
+      share_green_unwtd=mean(share_green),
+      share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
+      share_brown_unwtd=mean(share_brown),
+      share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+      share_neutral_unwtd=mean(share_neutral),
+      
+      # categorical (abs)
+      share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+      share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+      share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+      share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+      share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+      share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+      
+      # categorical (rel)
+      share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+      share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+      share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+      share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+      share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+      share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
+    )
+  
+  df_occ_dist_2d <- dfm %>% 
+    group_by(EF541UG2) %>% 
+    summarise(
+      # prüfung
+      n_obs=sum(n_obs), 
+      EF952_sum=sum(EF952),
+      
+      # share-based
+      share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
+      share_green_unwtd=mean(share_green),
+      share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
+      share_brown_unwtd=mean(share_brown),
+      share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+      share_neutral_unwtd=mean(share_neutral),
+      
+      # categorical (abs)
+      share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+      share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+      share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+      share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+      share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+      share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+      
+      # categorical (rel)
+      share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+      share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+      share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+      share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+      share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+      share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
+    )
+  
+  df_occ_dist_1d <- dfm %>% 
+    group_by(EF541UG3) %>% 
+    summarise(
+      # prüfung
+      n_obs=sum(n_obs), 
+      EF952_sum=sum(EF952),
+      
+      # share-based
+      share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
+      share_green_unwtd=mean(share_green),
+      share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
+      share_brown_unwtd=mean(share_brown),
+      share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
+      share_neutral_unwtd=mean(share_neutral),
+      
+      # categorical (abs)
+      share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
+      share_green_cat_abs_unwtd=mean(share_green_cat_abs),
+      share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
+      share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
+      share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
+      share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
+      
+      # categorical (rel)
+      share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
+      share_green_cat_rel_unwtd=mean(share_green_cat_rel),
+      share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
+      share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
+      share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
+      share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
+    )
+  
+  # save
+  write_csv(df_occ_dist_4d, file=file.path(outputpfad, occ_list_version, "weighted_occ_shares_ISCO4D.csv"))
+  write_csv(df_occ_dist_3d, file=file.path(outputpfad, occ_list_version, "weighted_occ_shares_ISCO3D.csv"))
+  write_csv(df_occ_dist_2d, file=file.path(outputpfad, occ_list_version, "weighted_occ_shares_ISCO2D.csv"))
+  write_csv(df_occ_dist_1d, file=file.path(outputpfad, occ_list_version, "weighted_occ_shares_ISCO1D.csv"))
   
   # -----------------------------------------------------------------------------
   # 2.3) Grouping of occupational shares by region
@@ -515,220 +657,222 @@ for (occ_list_version in occ_list_versions) {
   
   # -----------------------------------------------------------------------------
   
-  # pivot to long format
-  dfm_long <- pivot_longer(dfm, starts_with("share"), names_to = "share_type", values_to = "share_value")
-  
-  # with age
-  cor.test(x = dfm$EF44, y = dfm$share_green)
-  
-  # bin age variable
-  dfm_long$EF44_bin5 <- cut_width(dfm_long$EF44, width=5, boundary=0)
-  
-  ggplot(dfm_long, aes(x = as.factor(EF44_bin5), y = share_value)) +
-    stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-    facet_wrap(~share_type, scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  ggsave(
-    "shares_by_EF44.pdf",
-    path=file.path(outputpfad, occ_list_version),
-    height=5,
-    width = 20
-  )
-  
-  # output für prüfung: number of obs per bin
-  dfm_long %>%
-    group_by(share_type, EF44_bin5) %>%
-    summarise(
-      n_obs=sum(n_obs),
-      EF952_sum=sum(EF952),
-      mean=mean(share_value, na.rm = TRUE),
-      mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
-      sd=sd(share_value, na.rm = TRUE),
-      sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
-      median=median(share_value, na.rm = TRUE),
-      q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
-      q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
-      median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
-      q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
-      q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
-    ) %>%
-    write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF44.csv"))
-  
-  # with sex
-  cor.test(x = as.integer(dfm$EF46), y = dfm$share_green)
-  
-  ggplot(dfm_long, aes(x = EF46, y = share_value)) +
-    stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-    facet_wrap(~share_type, scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  ggsave(
-    "shares_by_EF46.pdf",
-    path=file.path(outputpfad, occ_list_version),
-    height=5,
-    width = 20
-  )
-  
-  # output für prüfung: number of obs per bin
-  dfm_long %>%
-    group_by(share_type, EF46) %>%
-    summarise(
-      n_obs=sum(n_obs),
-      EF952_sum=sum(EF952),
-      mean=mean(share_value, na.rm = TRUE),
-      mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
-      sd=sd(share_value, na.rm = TRUE),
-      sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
-      median=median(share_value, na.rm = TRUE),
-      q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
-      q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
-      median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
-      q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
-      q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
-    ) %>%
-    write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF46.csv"))
-  
-  # with income
-  cor.test(x = as.integer(dfm$EF436), y = dfm$share_green)
-  cor.test(x = as.integer(dfm$EF442), y = dfm$share_green)
-  
-  ggplot(dfm_long, aes(x = EF436, y = share_value)) +
-    stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-    facet_wrap(~share_type, scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  ggsave(
-    "shares_by_EF436.pdf",
-    path=file.path(outputpfad, occ_list_version),
-    height=5,
-    width = 20
-  )
-  
-  # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
-  try({
-    dfm_long %>%
-      group_by(share_type, EF436) %>%
-      summarise(
-        n_obs=sum(n_obs),
-        EF952_sum=sum(EF952),
-        mean=mean(share_value, na.rm = TRUE),
-        mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
-        sd=sd(share_value, na.rm = TRUE),
-        sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
-        median=median(share_value, na.rm = TRUE),
-        q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
-        q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
-        median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
-        q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
-        q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
-      ) %>%
-      write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF436.csv"))
-  })
-  
-  ggplot(dfm_long, aes(x = EF442, y = share_value)) +
-    stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-    facet_wrap(~share_type, scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  
-  ggsave(
-    "shares_by_EF442.pdf",
-    path=file.path(outputpfad, occ_list_version),
-    height=5,
-    width = 20
-  )
-  
-  # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
-  try({
-    dfm_long %>%
-      group_by(share_type, EF442) %>%
-      summarise(
-        n_obs=sum(n_obs),
-        EF952_sum=sum(EF952),
-        mean=mean(share_value, na.rm = TRUE),
-        mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
-        sd=sd(share_value, na.rm = TRUE),
-        sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
-        median=median(share_value, na.rm = TRUE),
-        q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
-        q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
-        median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
-        q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
-        q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
-      ) %>%
-      write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF442.csv"))
-  })
-  
-  # with education level
-  cor.test(x = as.integer(dfm$EF517), y = dfm$share_green)
-  cor.test(x = as.integer(dfm$EF540), y = dfm$share_green)
-  
-  ggplot(dfm_long, aes(x = EF517, y = share_value)) +
-    stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-    facet_wrap(~share_type, scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  ggsave(
-    "shares_by_EF517.pdf",
-    path=file.path(outputpfad, occ_list_version),
-    height=5,
-    width = 20
-  )
-  
-  # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
-  try({
-    dfm_long %>%
-      group_by(share_type, EF517) %>%
-      summarise(
-        n_obs=sum(n_obs),
-        EF952_sum=sum(EF952),
-        mean=mean(share_value, na.rm = TRUE),
-        mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
-        sd=sd(share_value, na.rm = TRUE),
-        sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
-        median=median(share_value, na.rm = TRUE),
-        q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
-        q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
-        median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
-        q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
-        q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
-      ) %>%
-      write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF517.csv"))
-  })
-  
-  ggplot(dfm_long, aes(x = EF540, y = share_value)) +
-    stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-    facet_wrap(~share_type, scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  
-  ggsave(
-    "shares_by_EF540.pdf",
-    path=file.path(outputpfad, occ_list_version),
-    height=5,
-    width = 20
-  )
-  
-  # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
-  try({
-    dfm_long %>%
-      group_by(share_type, EF540) %>%
-      summarise(
-        n_obs=sum(n_obs),
-        EF952_sum=sum(EF952),
-        mean=mean(share_value, na.rm = TRUE),
-        mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
-        sd=sd(share_value, na.rm = TRUE),
-        sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
-        median=median(share_value, na.rm = TRUE),
-        q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
-        q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
-        median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
-        q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
-        q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
-      ) %>%
-      write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF540.csv"))
-  })
+  # START OF TEMPORARY COMMENT 23.09.2022
+  # # pivot to long format
+  # dfm_long <- pivot_longer(dfm, starts_with("share"), names_to = "share_type", values_to = "share_value")
+  # 
+  # # with age
+  # cor.test(x = dfm$EF44, y = dfm$share_green)
+  # 
+  # # bin age variable
+  # dfm_long$EF44_bin5 <- cut_width(dfm_long$EF44, width=5, boundary=0)
+  # 
+  # ggplot(dfm_long, aes(x = as.factor(EF44_bin5), y = share_value)) +
+  #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+  #   facet_wrap(~share_type, scales = "free_y") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # 
+  # ggsave(
+  #   "shares_by_EF44.pdf",
+  #   path=file.path(outputpfad, occ_list_version),
+  #   height=5,
+  #   width = 20
+  # )
+  # 
+  # # output für prüfung: number of obs per bin
+  # dfm_long %>%
+  #   group_by(share_type, EF44_bin5) %>%
+  #   summarise(
+  #     n_obs=sum(n_obs),
+  #     EF952_sum=sum(EF952),
+  #     mean=mean(share_value, na.rm = TRUE),
+  #     mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
+  #     sd=sd(share_value, na.rm = TRUE),
+  #     sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
+  #     median=median(share_value, na.rm = TRUE),
+  #     q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
+  #     q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
+  #     median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
+  #     q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
+  #     q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
+  #   ) %>%
+  #   write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF44.csv"))
+  # 
+  # # with sex
+  # cor.test(x = as.integer(dfm$EF46), y = dfm$share_green)
+  # 
+  # ggplot(dfm_long, aes(x = EF46, y = share_value)) +
+  #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+  #   facet_wrap(~share_type, scales = "free_y") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # 
+  # ggsave(
+  #   "shares_by_EF46.pdf",
+  #   path=file.path(outputpfad, occ_list_version),
+  #   height=5,
+  #   width = 20
+  # )
+  # 
+  # # output für prüfung: number of obs per bin
+  # dfm_long %>%
+  #   group_by(share_type, EF46) %>%
+  #   summarise(
+  #     n_obs=sum(n_obs),
+  #     EF952_sum=sum(EF952),
+  #     mean=mean(share_value, na.rm = TRUE),
+  #     mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
+  #     sd=sd(share_value, na.rm = TRUE),
+  #     sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
+  #     median=median(share_value, na.rm = TRUE),
+  #     q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
+  #     q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
+  #     median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
+  #     q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
+  #     q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
+  #   ) %>%
+  #   write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF46.csv"))
+  # 
+  # # with income
+  # cor.test(x = as.integer(dfm$EF436), y = dfm$share_green)
+  # cor.test(x = as.integer(dfm$EF442), y = dfm$share_green)
+  # 
+  # ggplot(dfm_long, aes(x = EF436, y = share_value)) +
+  #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+  #   facet_wrap(~share_type, scales = "free_y") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # 
+  # ggsave(
+  #   "shares_by_EF436.pdf",
+  #   path=file.path(outputpfad, occ_list_version),
+  #   height=5,
+  #   width = 20
+  # )
+  # 
+  # # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
+  # try({
+  #   dfm_long %>%
+  #     group_by(share_type, EF436) %>%
+  #     summarise(
+  #       n_obs=sum(n_obs),
+  #       EF952_sum=sum(EF952),
+  #       mean=mean(share_value, na.rm = TRUE),
+  #       mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
+  #       sd=sd(share_value, na.rm = TRUE),
+  #       sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
+  #       median=median(share_value, na.rm = TRUE),
+  #       q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
+  #       q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
+  #       median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
+  #       q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
+  #       q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
+  #     ) %>%
+  #     write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF436.csv"))
+  # })
+  # 
+  # ggplot(dfm_long, aes(x = EF442, y = share_value)) +
+  #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+  #   facet_wrap(~share_type, scales = "free_y") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # 
+  # 
+  # ggsave(
+  #   "shares_by_EF442.pdf",
+  #   path=file.path(outputpfad, occ_list_version),
+  #   height=5,
+  #   width = 20
+  # )
+  # 
+  # # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
+  # try({
+  #   dfm_long %>%
+  #     group_by(share_type, EF442) %>%
+  #     summarise(
+  #       n_obs=sum(n_obs),
+  #       EF952_sum=sum(EF952),
+  #       mean=mean(share_value, na.rm = TRUE),
+  #       mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
+  #       sd=sd(share_value, na.rm = TRUE),
+  #       sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
+  #       median=median(share_value, na.rm = TRUE),
+  #       q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
+  #       q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
+  #       median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
+  #       q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
+  #       q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
+  #     ) %>%
+  #     write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF442.csv"))
+  # })
+  # 
+  # # with education level
+  # cor.test(x = as.integer(dfm$EF517), y = dfm$share_green)
+  # cor.test(x = as.integer(dfm$EF540), y = dfm$share_green)
+  # 
+  # ggplot(dfm_long, aes(x = EF517, y = share_value)) +
+  #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+  #   facet_wrap(~share_type, scales = "free_y") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # 
+  # ggsave(
+  #   "shares_by_EF517.pdf",
+  #   path=file.path(outputpfad, occ_list_version),
+  #   height=5,
+  #   width = 20
+  # )
+  # 
+  # # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
+  # try({
+  #   dfm_long %>%
+  #     group_by(share_type, EF517) %>%
+  #     summarise(
+  #       n_obs=sum(n_obs),
+  #       EF952_sum=sum(EF952),
+  #       mean=mean(share_value, na.rm = TRUE),
+  #       mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
+  #       sd=sd(share_value, na.rm = TRUE),
+  #       sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
+  #       median=median(share_value, na.rm = TRUE),
+  #       q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
+  #       q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
+  #       median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
+  #       q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
+  #       q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
+  #     ) %>%
+  #     write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF517.csv"))
+  # })
+  # 
+  # ggplot(dfm_long, aes(x = EF540, y = share_value)) +
+  #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+  #   facet_wrap(~share_type, scales = "free_y") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # 
+  # ggsave(
+  #   "shares_by_EF540.pdf",
+  #   path=file.path(outputpfad, occ_list_version),
+  #   height=5,
+  #   width = 20
+  # )
+  # 
+  # # note: error is thrown by HMISC wtd functions if only NAN values in a group slice
+  # try({
+  #   dfm_long %>%
+  #     group_by(share_type, EF540) %>%
+  #     summarise(
+  #       n_obs=sum(n_obs),
+  #       EF952_sum=sum(EF952),
+  #       mean=mean(share_value, na.rm = TRUE),
+  #       mean_weighted=wtd.mean(share_value, EF952, na.rm=TRUE, normwt=TRUE),
+  #       sd=sd(share_value, na.rm = TRUE),
+  #       sd_weighted=sqrt(wtd.var(share_value, EF952, na.rm=TRUE, normwt=TRUE)),
+  #       median=median(share_value, na.rm = TRUE),
+  #       q25=quantile(share_value, na.rm = TRUE, probs=c(.25)),
+  #       q75=quantile(share_value, na.rm = TRUE, probs=c(.75)),
+  #       median_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.5), normwt=TRUE),
+  #       q25_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.25), normwt=TRUE),
+  #       q75_weighted=wtd.quantile(share_value, EF952, na.rm=TRUE, probs=c(.75), normwt=TRUE),
+  #     ) %>%
+  #     write.csv(file.path(outputpfad, occ_list_version, "shares_by_EF540.csv"))
+  # })
+  # END OF TEMPORARY COMMENT 23.09.2022
   
   # -----------------------------------------------------------------------------
   # 4) Analysis of sociodemographics by category
@@ -748,6 +892,7 @@ for (occ_list_version in occ_list_versions) {
   
   
   for (category_version in category_versions){
+    print(category_version)
     # summary tables incl. tests for significant differences btw groups
     # -------------------------------------------------------------------------
     
@@ -776,291 +921,150 @@ for (occ_list_version in occ_list_versions) {
       digits = 5
     )
     
-    # pairwise tests for diff between groups
-    # -------------------------------------------------------------------------
-    
-    # age
-    kruskal.test(dfm$EF44, dfm[[category_version]])
-    oneway.test(EF44 ~ dfm[[category_version]], data = dfm)
-    pairwise.t.test(dfm$EF44, dfm[[category_version]], p.adjust.method = "bonferroni")
-    pairwise.wilcox.test(dfm$EF44, dfm[[category_version]], p.adjust.method = "holm")
-    
-    # gender
-    chisq.test(dfm$EF46, dfm[[category_version]])
-    
-    # income
-    kruskal.test(dfm$EF436_num, dfm[[category_version]])
-    oneway.test(EF436_num ~ dfm[[category_version]], data = dfm)
-    pairwise.t.test(dfm$EF436_num, dfm[[category_version]], p.adjust.method = "bonferroni")
-    pairwise.wilcox.test(dfm$EF436_num, dfm[[category_version]], p.adjust.method = "holm")
-    
-    # education
-    chisq.test(dfm$EF517, dfm[[category_version]])
-    chisq.test(dfm$EF540, dfm[[category_version]])
-    
-    
-    # barplots for GBN groups (hinweis: numerische werte sind jeweils in den summentabellen abgespeichert)
-    # -------------------------------------------------------------------------
-    
-    # age
-    ggplot(dfm, aes(x = .data[[category_version]], y=EF44)) +
-      stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-      stat_summary(fun = mean, geom = "point") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Group", y="Age [yrs] (EF44)")
-    
-    ggsave(
-      paste0(category_version, "_by_EF44.pdf"),
-      path=file.path(outputpfad, occ_list_version)
-    )
-    
-    # gender
-    ggplot(dfm, aes(x = .data[[category_version]], fill = EF46, weight=EF952)) +
-      geom_bar(position = "dodge") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Gender", y="Population [-] (EF952)") +
-      scale_fill_manual(values = fill_colors)
-    
-    ggsave(
-      paste0(category_version, "_by_EF46.pdf"),
-      path=file.path(outputpfad, occ_list_version)
-    )
-    
-    # education, 1
-    ggplot(dfm, aes(x = EF517, fill = .data[[category_version]], weight=EF952)) +
-      geom_bar(position = "dodge") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Education (EF517)", y="Population [-] (EF952)") +
-      scale_fill_manual(values = fill_colors)
-    
-    ggsave(
-      paste0(category_version, "_by_EF517.pdf"),
-      path=file.path(outputpfad, occ_list_version),
-      width = 10
-    )
-    
-    ggplot(dfm) +
-      geom_mosaic(aes(x=product(EF517, category_abs), fill=EF517, weight=EF952))
-    
-    ggsave(
-      paste0(category_version, "_by_EF517_mosaic.pdf"),
-      path=file.path(outputpfad, occ_list_version)
-    )
-    
-    # education, 2
-    ggplot(dfm, aes(x = EF540, weight=EF952, fill = .data[[category_version]])) +
-      geom_bar(position = "dodge") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Education (EF540)", y="Population [-] (EF952)") +
-      scale_fill_manual(values = fill_colors)
-    
-    ggsave(
-      paste0(category_version, "_by_EF540.pdf"),
-      path=file.path(outputpfad, occ_list_version),
-      width = 10
-    )
-    
-    ggplot(dfm) +
-      geom_mosaic(aes(x=product(EF540, category_abs), fill=EF540, weight=EF952))
-    
-    ggsave(
-      paste0(category_version, "_by_EF540_mosaic.pdf"),
-      path=file.path(outputpfad, occ_list_version)
-    )
-    
-    # income, personal
-    ggplot(dfm, aes(x = EF436, weight=EF952, fill = .data[[category_version]])) +
-      geom_bar(position = "dodge") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Income, personal [Euro/month] (EF436)", y="Population [-] (EF952)") +
-      scale_fill_manual(values = fill_colors)
-    
-    ggsave(
-      paste0(category_version, "_by_EF436.pdf"),
-      path=file.path(outputpfad, occ_list_version),
-      width = 10
-    )
-    
-    ggplot(dfm, aes(x = .data[[category_version]], y=EF436_num)) +
-      stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-      stat_summary(fun = mean, geom = "point") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Group", y="Income, personal [Euro/month] (EF436)")
-    
-    ggsave(
-      paste0(category_version, "_by_EF436_num.pdf"),
-      path=file.path(outputpfad, occ_list_version)
-    )
-    
-    # income, average
-    ggplot(dfm, aes(x = EF442, y=EF952, fill = .data[[category_version]])) +
-      geom_col(position = "dodge") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Income, average [Euro/month] (EF442)", y="Population [-] (EF952)") +
-      scale_fill_manual(values = fill_colors)
-    
-    ggsave(
-      paste0(category_version, "_by_EF442.pdf"),
-      path=file.path(outputpfad, occ_list_version),
-      width = 10
-    )
-      
-    ggplot(dfm, aes(x = .data[[category_version]], y=EF442_num)) +
-      stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
-      stat_summary(fun = mean, geom = "point") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      labs(x="Group", y="Income, personal [Euro/month] (EF442)")
-    
-    ggsave(
-      paste0(category_version, "_by_EF442_num.pdf"),
-      path=file.path(outputpfad, occ_list_version)
-    )
-    
-    # obtain weighted occ shares within ISCO groups based on categorical classification
-    
-    
+    # START OF TEMPORARY COMMENT 23.09.2022
+    # # pairwise tests for diff between groups
+    # # -------------------------------------------------------------------------
+    # 
+    # # age
+    # kruskal.test(dfm$EF44, dfm[[category_version]])
+    # oneway.test(EF44 ~ dfm[[category_version]], data = dfm)
+    # pairwise.t.test(dfm$EF44, dfm[[category_version]], p.adjust.method = "bonferroni")
+    # pairwise.wilcox.test(dfm$EF44, dfm[[category_version]], p.adjust.method = "holm")
+    # 
+    # # gender
+    # chisq.test(dfm$EF46, dfm[[category_version]])
+    # 
+    # # income
+    # kruskal.test(dfm$EF436_num, dfm[[category_version]])
+    # oneway.test(EF436_num ~ dfm[[category_version]], data = dfm)
+    # pairwise.t.test(dfm$EF436_num, dfm[[category_version]], p.adjust.method = "bonferroni")
+    # pairwise.wilcox.test(dfm$EF436_num, dfm[[category_version]], p.adjust.method = "holm")
+    # 
+    # # education
+    # chisq.test(dfm$EF517, dfm[[category_version]])
+    # chisq.test(dfm$EF540, dfm[[category_version]])
+    # 
+    # 
+    # # barplots for GBN groups (hinweis: numerische werte sind jeweils in den summentabellen abgespeichert)
+    # # -------------------------------------------------------------------------
+    # 
+    # # age
+    # ggplot(dfm, aes(x = .data[[category_version]], y=EF44)) +
+    #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+    #   stat_summary(fun = mean, geom = "point") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Group", y="Age [yrs] (EF44)")
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF44.pdf"),
+    #   path=file.path(outputpfad, occ_list_version)
+    # )
+    # 
+    # # gender
+    # ggplot(dfm, aes(x = .data[[category_version]], fill = EF46, weight=EF952)) +
+    #   geom_bar(position = "dodge") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Gender", y="Population [-] (EF952)") +
+    #   scale_fill_manual(values = fill_colors)
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF46.pdf"),
+    #   path=file.path(outputpfad, occ_list_version)
+    # )
+    # 
+    # # education, 1
+    # ggplot(dfm, aes(x = EF517, fill = .data[[category_version]], weight=EF952)) +
+    #   geom_bar(position = "dodge") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Education (EF517)", y="Population [-] (EF952)") +
+    #   scale_fill_manual(values = fill_colors)
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF517.pdf"),
+    #   path=file.path(outputpfad, occ_list_version),
+    #   width = 10
+    # )
+    # 
+    # ggplot(dfm) +
+    #   geom_mosaic(aes(x=product(EF517, category_abs), fill=EF517, weight=EF952))
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF517_mosaic.pdf"),
+    #   path=file.path(outputpfad, occ_list_version)
+    # )
+    # 
+    # # education, 2
+    # ggplot(dfm, aes(x = EF540, weight=EF952, fill = .data[[category_version]])) +
+    #   geom_bar(position = "dodge") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Education (EF540)", y="Population [-] (EF952)") +
+    #   scale_fill_manual(values = fill_colors)
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF540.pdf"),
+    #   path=file.path(outputpfad, occ_list_version),
+    #   width = 10
+    # )
+    # 
+    # ggplot(dfm) +
+    #   geom_mosaic(aes(x=product(EF540, category_abs), fill=EF540, weight=EF952))
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF540_mosaic.pdf"),
+    #   path=file.path(outputpfad, occ_list_version)
+    # )
+    # 
+    # # income, personal
+    # ggplot(dfm, aes(x = EF436, weight=EF952, fill = .data[[category_version]])) +
+    #   geom_bar(position = "dodge") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Income, personal [Euro/month] (EF436)", y="Population [-] (EF952)") +
+    #   scale_fill_manual(values = fill_colors)
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF436.pdf"),
+    #   path=file.path(outputpfad, occ_list_version),
+    #   width = 10
+    # )
+    # 
+    # ggplot(dfm, aes(x = .data[[category_version]], y=EF436_num)) +
+    #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+    #   stat_summary(fun = mean, geom = "point") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Group", y="Income, personal [Euro/month] (EF436)")
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF436_num.pdf"),
+    #   path=file.path(outputpfad, occ_list_version)
+    # )
+    # 
+    # # income, average
+    # ggplot(dfm, aes(x = EF442, y=EF952, fill = .data[[category_version]])) +
+    #   geom_col(position = "dodge") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Income, average [Euro/month] (EF442)", y="Population [-] (EF952)") +
+    #   scale_fill_manual(values = fill_colors)
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF442.pdf"),
+    #   path=file.path(outputpfad, occ_list_version),
+    #   width = 10
+    # )
+    #   
+    # ggplot(dfm, aes(x = .data[[category_version]], y=EF442_num)) +
+    #   stat_summary(fun.data = calc_boxplot_stat, geom="boxplot") +
+    #   stat_summary(fun = mean, geom = "point") +
+    #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    #   labs(x="Group", y="Income, personal [Euro/month] (EF442)")
+    # 
+    # ggsave(
+    #   paste0(category_version, "_by_EF442_num.pdf"),
+    #   path=file.path(outputpfad, occ_list_version)
+    # )
+    # END OF TEMPORARY COMMENT 23.09.2022
   }
   
 }
-
-# -----------------------------------------------------------------------------
-# 2.4) Occupational shares at ISCO level weighted by KldB 5-digit occupation counts
-# -----------------------------------------------------------------------------
-
-# obtain weighted occ shares within ISCO groups based on ESCO-derived shares
-df_occ_dist_4d <- dfm %>% 
-  group_by(EF541) %>% 
-  summarise(
-    # prüfung
-    n_obs=sum(n_obs), 
-    EF952_sum=sum(EF952),
-    
-    # share-based
-    share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_green_unwtd=mean(share_green),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_brown_unwtd=mean(share_brown),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
-    share_neutral_unwtd=mean(share_neutral),
-    
-    # categorical (abs)
-    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
-    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
-    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
-    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
-    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
-    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
-    
-    # categorical (rel)
-    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
-    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
-    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
-    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
-    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
-    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
-    )
-
-df_occ_dist_3d <- dfm %>% 
-  group_by(EF541UG1) %>% 
-  summarise(
-    # prüfung
-    n_obs=sum(n_obs), 
-    EF952_sum=sum(EF952),
-    
-    # share-based
-    share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_green_unwtd=mean(share_green),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_brown_unwtd=mean(share_brown),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
-    share_neutral_unwtd=mean(share_neutral),
-    
-    # categorical (abs)
-    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
-    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
-    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
-    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
-    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
-    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
-    
-    # categorical (rel)
-    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
-    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
-    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
-    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
-    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
-    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
-  )
-
-df_occ_dist_2d <- dfm %>% 
-  group_by(EF541UG2) %>% 
-  summarise(
-    # prüfung
-    n_obs=sum(n_obs), 
-    EF952_sum=sum(EF952),
-    
-    # share-based
-    share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_green_unwtd=mean(share_green),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_brown_unwtd=mean(share_brown),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
-    share_neutral_unwtd=mean(share_neutral),
-    
-    # categorical (abs)
-    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
-    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
-    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
-    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
-    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
-    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
-    
-    # categorical (rel)
-    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
-    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
-    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
-    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
-    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
-    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
-  )
-
-df_occ_dist_1d <- dfm %>% 
-  group_by(EF541UG3) %>% 
-  summarise(
-    # prüfung
-    n_obs=sum(n_obs), 
-    EF952_sum=sum(EF952),
-    
-    # share-based
-    share_green_wtd=wtd.mean(share_green, weights = EF952, normwt = TRUE),
-    share_green_unwtd=mean(share_green),
-    share_brown_wtd=wtd.mean(share_brown, weights = EF952, normwt = TRUE),
-    share_brown_unwtd=mean(share_brown),
-    share_neutral_wtd=wtd.mean(share_neutral, weights = EF952, normwt = TRUE),
-    share_neutral_unwtd=mean(share_neutral),
-    
-    # categorical (abs)
-    share_green_cat_abs_wtd=wtd.mean(share_green_cat_abs, weights = EF952, normwt = TRUE),
-    share_green_cat_abs_unwtd=mean(share_green_cat_abs),
-    share_brown_cat_abs_wtd=wtd.mean(share_brown_cat_abs, weights = EF952, normwt = TRUE),
-    share_brown_cat_abs_unwtd=mean(share_brown_cat_abs),
-    share_neutral_cat_abs_wtd=wtd.mean(share_neutral_cat_abs, weights = EF952, normwt = TRUE),
-    share_neutral_cat_abs_unwtd=mean(share_neutral_cat_abs),
-    
-    # categorical (rel)
-    share_green_cat_rel_wtd=wtd.mean(share_green_cat_rel, weights = EF952, normwt = TRUE),
-    share_green_cat_rel_unwtd=mean(share_green_cat_rel),
-    share_brown_cat_rel_wtd=wtd.mean(share_brown_cat_rel, weights = EF952, normwt = TRUE),
-    share_brown_cat_rel_unwtd=mean(share_brown_cat_rel),
-    share_neutral_cat_rel_wtd=wtd.mean(share_neutral_cat_rel, weights = EF952, normwt = TRUE),
-    share_neutral_cat_rel_unwtd=mean(share_neutral_cat_rel)
-  )
-
-# save
-write_csv(df_occ_dist_4d, file=file.path(outputpfad, "weighted_occ_shares_ISCO4D.csv"))
-write_csv(df_occ_dist_3d, file=file.path(outputpfad, "weighted_occ_shares_ISCO3D.csv"))
-write_csv(df_occ_dist_2d, file=file.path(outputpfad, "weighted_occ_shares_ISCO2D.csv"))
-write_csv(df_occ_dist_1d, file=file.path(outputpfad, "weighted_occ_shares_ISCO1D.csv"))
 
 # -----------------------------------------------------------------------------
 # 2.5) Fallzahltabellen der Restpopulation

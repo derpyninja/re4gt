@@ -122,12 +122,24 @@ class ReskillingPathways:
         # -----------------------------------------------------------------------------
         # DATA
         # -----------------------------------------------------------------------------
-        # load similarity and annotate granularity levels
+        # load similarity and annotate granularity levels (baseline version)
         self.df_occ_sim = occupation_distance.occ_sim_matrix_by_levels(
             sim_metric=self.sim_metric,
             osm_version=self.osm_version,
             diagonal_zeros=self.osim_diag_zeros,
+            upskilling_ids=None,
         )
+
+        # read bipartite adjacency matrix for occupations and skills
+        self.occ_skills_mat = esco.read_occ_skills_matrix(
+            return_version=self.osm_version
+        )
+
+        # create 3D version
+        self.occ_skills_mat.index = occupation_distance.create_multiindex_for_esco_occs(
+            esco.occupations
+        )
+        self.occ_skills_mat_3d = self.occ_skills_mat.groupby(level=3).mean()
 
         # Read geodata with NUTS regions
         self.gdf = gpd.read_file(
@@ -137,6 +149,16 @@ class ReskillingPathways:
                 "NUTS_RG_03M_2021_4326_LEVL_2",
                 "NUTS_RG_03M_2021_4326_LEVL_2.shp",
             )
+        )
+
+        # occupation-specific skill that unlocks most new transitions
+        self.df_optimal_upskilling_per_occ = pd.read_csv(
+            os.path.join(
+                useful_paths.data_interim,
+                "upskilling_analysis",
+                "upskilling_selected_skill_per_occupation.csv",
+            ),
+            index_col=0,
         )
 
         # based on full, unaggregated matrix
@@ -225,7 +247,13 @@ class ReskillingPathways:
 
         return occs_at_level
 
-    def sim_matrix_at_level(self, level="isco_3_digit", agg_func="mean"):
+    def sim_matrix_at_level(
+        self,
+        level="isco_3_digit",
+        agg_func="mean",
+        upskilling_ids=None,
+        occ_skills_mat=None,
+    ):
         """
         Average the original occupation similarity matrix at a specific occupation
         group level.
@@ -248,8 +276,19 @@ class ReskillingPathways:
             Aggregated occupation similarity matrix.
         """
         lvl_code = utils.reverse_dict(self.level_dict)[level]
+
+        if upskilling_ids is None:
+            df_occ_sim = self.df_occ_sim
+        else:
+            df_occ_sim = occupation_distance.occ_sim_matrix_by_levels(
+                occ_skills_mat=occ_skills_mat,
+                osm_version=self.osm_version,
+                sim_metric=self.sim_metric,
+                upskilling_ids=upskilling_ids,
+            )
+
         sim_matrix_agg = (
-            self.df_occ_sim.groupby(level=lvl_code, axis=0)
+            df_occ_sim.groupby(level=lvl_code, axis=0)
             .aggregate(agg_func)
             .groupby(level=lvl_code, axis=1)
             .aggregate(agg_func)
@@ -644,6 +683,7 @@ class ReskillingPathways:
         level="isco_3_digit",
         countries=None,
         scenarios=None,
+        upskill_workers=False,
         transition_optimisation="wage",
         out_dir=os.path.join(useful_paths.figure_dir, "reskilling_simulation"),
     ):
@@ -676,16 +716,19 @@ class ReskillingPathways:
         # define transition pool based on scenario
         if scenarios is None:
             scenarios = self.phaseout_scenarios
-        # todo: extend country selection
         if countries is None:
             countries = ["DE"]
 
-        # read sim matrix
-        similarity_matrix = self.sim_matrix_at_level(level=level).values
+        simulation_name = {False: "baseline", True: "upskilling"}
+
+        if not upskill_workers:
+            # read sim matrix
+            similarity_matrix = self.sim_matrix_at_level(level=level).values
+        else:
+            occ_skills_mat_3d = self.occ_skills_mat_3d
 
         # define transition thresholds
         q_viable, q_highly_viable = self.trans_thresh_pc_approach
-        print(q_viable, q_highly_viable)
 
         # -----------------------------------------------------------------------------
         # Scenario loop
@@ -706,6 +749,7 @@ class ReskillingPathways:
             # -------------------------------------------------------------------------
             # Country loop
             # -------------------------------------------------------------------------
+            scenario_results = {}
             for country in countries:
                 print("  country: {}".format(country))
                 # select scenario- and country-specific transition pool
@@ -749,6 +793,33 @@ class ReskillingPathways:
                         df_occs["preferredLabel"] == search_label
                     ].index.values[0]
 
+                    # -----------------------------------------------------------------
+                    # Upskilling step (optional)
+                    # -----------------------------------------------------------------
+                    if upskill_workers:
+                        # conditional on the source occupation, upskill worker with the skill unlocking the highest number of new viable transitions
+                        upskilling_data = self.df_optimal_upskilling_per_occ.loc[
+                            self.df_optimal_upskilling_per_occ.Occupation
+                            == search_label
+                        ]
+
+                        # extract id/idx
+                        id_occ = upskilling_data.id_occ.values[0].astype(str)
+                        idx_occ = df_occs[df_occs["code"] == id_occ].index.values[0]
+                        idx_skill = upskilling_data.id_skill.values[0]
+
+                        # update occ-skills matrix with worker's newly acquired skill
+                        occ_skills_mat_3d_upskilling = occ_skills_mat_3d.copy()
+                        occ_skills_mat_3d_upskilling.iloc[idx_occ, idx_skill] = 1
+
+                        # recalc occ sim matrix
+                        similarity_matrix = np.matmul(
+                            occ_skills_mat_3d_upskilling.values,
+                            occ_skills_mat_3d_upskilling.values.transpose(),
+                        )
+                        np.fill_diagonal(similarity_matrix, 0)
+
+                    # find closest target occupations
                     target_occs = occupation_distance.find_closest(
                         i=idx, similarity_matrix=similarity_matrix, df=df_occs
                     )
@@ -760,7 +831,7 @@ class ReskillingPathways:
                     target_occs_filtered = target_occs_filtered.loc[
                         target_occs_filtered[category_version].isin(self.target_cats)
                     ]
-                    target_occs_filtered = target_occs_filtered.dropna()
+                    # target_occs_filtered = target_occs_filtered.dropna()
 
                     # earnings delta to next closest occupation
                     target_occs_filtered["wage_diff"] = (
@@ -840,12 +911,15 @@ class ReskillingPathways:
                     df_transition_numbers["earnings_delta_closest_switch_sum"] / 10**6
                 )
 
-                # store results
-                simulation_results[scenario] = {country: df_transition_numbers}
+                # store country results
+                scenario_results[country] = df_transition_numbers
+
+            # store scenario-country results
+            simulation_results[scenario] = scenario_results
 
         # save as pickle
-        dirname = "baseline_simulations_{}_optimisation_{}".format(
-            transition_optimisation, self.year
+        dirname = "{}_simulations_{}_optimisation_{}".format(
+            simulation_name[upskill_workers], transition_optimisation, self.year
         )
         fname = "{}.pkl".format(dirname)
 
@@ -872,13 +946,15 @@ class ReskillingPathways:
         base_dir=os.path.join(useful_paths.figure_dir, "reskilling_simulation"),
         year=2019,
         transition_optimisation="wage",
+        version="baseline",
+        show_plots=False,
     ):
 
         # read file if no results are passed
         if simulation_results is None:
             # path of in-file
-            dirname = "baseline_simulations_{}_optimisation_{}".format(
-                transition_optimisation, year
+            dirname = "{}_simulations_{}_optimisation_{}".format(
+                version, transition_optimisation, year
             )
             fname = "{}.pkl".format(dirname)
 
@@ -889,13 +965,14 @@ class ReskillingPathways:
 
         # iterate over scenarios and countries
         for scenario, country_results_dict in simulation_results.items():
-            print(scenario)
             for country, df_transition_numbers in country_results_dict.items():
-                print(country)
 
                 # select scenario-specific weighting coefficient
                 coeff_weight = self.transition_pool_weights[scenario]
 
+                # calc stats
+                n_obs = df_transition_numbers.shape[0]
+                n_workers = df_transition_numbers[coeff_weight].sum().astype(int)
                 # ---------------------------------------------------------------------
                 # REGIONAL AGGREGATION
                 # ---------------------------------------------------------------------
@@ -921,14 +998,21 @@ class ReskillingPathways:
                 # ---------------------------------------------------------------------
                 # REGIONAL PLOTS
                 # ---------------------------------------------------------------------
+                dirname = "{}_simulations_{}_optimisation_{}".format(
+                    version, transition_optimisation, self.year
+                )
+
                 fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(20, 20))
 
                 cmap_earnings = plt.get_cmap("coolwarm_r", 8)
                 cmap_earnings.set_over("darkblue")
                 cmap_earnings.set_under("darkred")
 
-                # cmap_transitions = plotting_utils.discrete_cmap_with_manual_colors(cmap_type="Blues", n_classes=5)
-                cmap_transitions = plt.get_cmap("Blues", 10)
+                cmap_transitions = plotting_utils.discrete_cmap_with_manual_colors(
+                    cmap_type="Blues",
+                    n_classes=10,
+                    colour_replacements={0: "lightcoral"},
+                )
                 cmap_transitions.set_over("darkblue")
 
                 # upper limits for colorbars
@@ -943,7 +1027,7 @@ class ReskillingPathways:
                     vmin=0,
                     vmax=vmax_transitions,
                     legend_kwds={
-                        "label": "Transitions per at-risk worker [-]",
+                        "label": "Viable transitions per at-risk worker [-]",
                         "fraction": 0.03,
                         "extend": "max",
                     },
@@ -969,7 +1053,7 @@ class ReskillingPathways:
                 )
 
                 ax1.set_title(
-                    "$\mu = {:.2f}$".format(
+                    "$Average = {:.2f}$".format(
                         gdf_transition_numbers_by_nuts.n_viable_transitions_rel.mean()
                     )
                 )
@@ -984,7 +1068,7 @@ class ReskillingPathways:
                     vmin=-v,
                     vmax=v,
                     legend_kwds={
-                        "label": "Change in total annual earnings [M€ (2010)]",
+                        "label": "$\Delta$ Annual earnings [M€ (2010)]",
                         "fraction": 0.03,
                         "extend": "both",
                     },
@@ -1011,30 +1095,165 @@ class ReskillingPathways:
                 )
 
                 ax2.set_title(
-                    "$\mu = {:.2f}~M€~(2010)$".format(
-                        gdf_transition_numbers_by_nuts.earnings_delta_closest_switch_sum_mio.mean()
+                    "$Total = {:.2f}~M€~(2010)$".format(
+                        gdf_transition_numbers_by_nuts.earnings_delta_closest_switch_sum_mio.sum()
                     )
                 )
                 ax2.axis("off")
 
                 # layout
                 fig.suptitle(
-                    "Scenario: {}, Country: {}, Year: {}".format(
-                        scenario.capitalize(), country, year
+                    "Country: {country}\n Year: {year}\n Scenario: {scenario}\n Workers: {n_workers}\n N: {n_obs}\n Optimise: {optimise}\n Version: {version}".format(
+                        version=version,
+                        scenario=scenario.capitalize(),
+                        country=country,
+                        year=year,
+                        optimise=transition_optimisation,
+                        n_workers=n_workers,
+                        n_obs=n_obs,
                     )
                 )
                 fig.tight_layout()
-                fig.subplots_adjust(top=1.5)
+                fig.subplots_adjust(top=1.4)
 
+                fname = "results_{}_{}_{}_{}.png".format(
+                    country, year, "regional", scenario
+                )
                 plt.savefig(
                     os.path.join(
                         useful_paths.figure_dir,
                         "reskilling_simulation",
-                        "n_transitions_by_region.png",
+                        dirname,
+                        fname,
                     ),
                     dpi=300,
                     bbox_inches="tight",
                 )
+
+                if not show_plots:
+                    plt.cla()
+                    fig.clf()
+
+                # ---------------------------------------------------------------------
+                # INDUSTRY PLOTS (earnings losses and transition numbers)
+                # ---------------------------------------------------------------------
+                vars = ["earnings_delta_closest_switch_sum_mio", "n_viable_transitions"]
+                var_labels = [
+                    "$\Delta$ Annual earnings [M€ (2010)]",
+                    "Transitions per at-risk worker",
+                ]
+                var_fname = ["earnings", "transitions"]
+
+                for i, var in enumerate(vars):
+                    fig, (ax1, ax2) = plt.subplots(
+                        ncols=2,
+                        figsize=(10, 5),
+                        sharey=True,
+                        sharex=False,
+                        gridspec_kw={"width_ratios": [0.7, 0.3]},
+                    )
+
+                    y_order = (
+                        df_transition_numbers.groupby("NACE1D_label")
+                        .median()[var]
+                        .sort_values(ascending=False)
+                        .index.values
+                    )
+
+                    # left
+                    if var_fname[i] == "earnings":
+                        sns.boxplot(
+                            data=df_transition_numbers,
+                            x=var,
+                            y="NACE1D_label",
+                            orient="h",
+                            fliersize=1,
+                            showmeans=True,
+                            meanprops={
+                                "marker": "^",
+                                "markerfacecolor": "white",
+                                "markeredgecolor": "black",
+                                "markersize": "5",
+                            },
+                            order=y_order,
+                            palette="RdYlGn_r",
+                            ax=ax1,
+                        )
+
+                        # right
+                        sns.barplot(
+                            data=df_transition_numbers,
+                            x=var,
+                            y="NACE1D_label",
+                            orient="h",
+                            estimator=np.sum,
+                            ci=None,
+                            order=y_order,
+                            palette="RdYlGn_r",
+                            ax=ax2,
+                        )
+                        ax2.bar_label(
+                            ax2.containers[-1], fmt="%.0f", label_type="center"
+                        )
+                    elif var_fname[i] == "transitions":
+                        sns.barplot(
+                            data=df_transition_numbers,
+                            x=var,
+                            y="NACE1D_label",
+                            orient="h",
+                            estimator=np.mean,
+                            ci="sd",
+                            order=y_order,
+                            palette="RdYlGn_r",
+                            ax=ax1,
+                        )
+                        ax1.axvline(1, linestyle="-", color="lightcoral", zorder=0)
+
+                    for ax in [ax1, ax2]:
+                        ax.axvline(0, linestyle="-", color="grey", zorder=0)
+                        ax.grid(linestyle=":")
+                        ax.set_xlabel(None)
+                        ax.set_ylabel(None)
+
+                    # labelling
+                    fig.text(0.7, 0.0, var_labels[i], ha="center")
+
+                    fig.suptitle(
+                        "Country: {country} | Year: {year} | Scenario: {scenario} | Workers: {n_workers} | N: {n_obs} | Optimise: {optimise} | Version: {version}".format(
+                            version=version,
+                            scenario=scenario.capitalize(),
+                            country=country,
+                            year=year,
+                            optimise=transition_optimisation,
+                            n_workers=n_workers,
+                            n_obs=n_obs,
+                        ),
+                        fontsize="small",
+                    )
+                    fig.tight_layout()
+                    fig.subplots_adjust(top=0.9)
+
+                    # layout
+                    sns.despine()
+
+                    # save
+                    fname = "results_{}_{}_{}_{}_{}.png".format(
+                        country, year, "sectoral", var_fname[i], scenario
+                    )
+                    plt.savefig(
+                        os.path.join(
+                            useful_paths.figure_dir,
+                            "reskilling_simulation",
+                            dirname,
+                            fname,
+                        ),
+                        dpi=300,
+                        bbox_inches="tight",
+                    )
+
+                    if not show_plots:
+                        plt.cla()
+                        fig.clf()
 
 
 if __name__ == "__main__":

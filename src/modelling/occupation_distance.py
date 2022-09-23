@@ -107,8 +107,31 @@ def find_closest(i, similarity_matrix, df, best="max"):
     return df
 
 
+def create_multiindex_for_esco_occs(occ):
+    occ["esco_5_digit"] = occ["code"].str.slice(0, 6)
+    occ["isco_4_digit"] = occ["iscoGroup"]
+    occ["isco_3_digit"] = occ["iscoGroup"].astype(str).str.slice(0, 3)
+
+    # Create multiindex
+    arrays = [
+        occ.conceptUri.values,
+        occ.esco_5_digit.values,
+        occ.isco_4_digit.values,
+        occ.isco_3_digit.values,
+    ]
+    tuples = list(zip(*arrays))
+    index = pd.MultiIndex.from_tuples(
+        tuples, names=["concept_uri", "esco_5_digit", "isco_4_digit", "isco_3_digit"]
+    )
+    return index
+
+
 def occ_sim_matrix_by_levels(
-    osm_version="weighted", sim_metric="cooc", diagonal_zeros=False
+    occ_skills_mat=None,
+    osm_version="weighted",
+    sim_metric="cooc",
+    diagonal_zeros=False,
+    upskilling_ids=None,
 ):
     """
 
@@ -122,11 +145,30 @@ def occ_sim_matrix_by_levels(
     -------
 
     """
-    if osm_version == "weighted" and sim_metric == "cooc":
-        # read bipartite adjacency matrix for occupations and skills
-        occ_skills_mat = esco.read_occ_skills_matrix(return_version=osm_version)
 
-        # esco-level similarity
+    # create multiindex for all granularity levels
+    occ = esco.occupations
+    index = create_multiindex_for_esco_occs(occ)
+
+    if osm_version == "weighted" and sim_metric == "cooc":
+        if occ_skills_mat is None:
+            # read bipartite adjacency matrix for occupations and skills
+            occ_skills_mat = esco.read_occ_skills_matrix(return_version=osm_version)
+
+        # if upskilling ids are provided
+        # note: currently only working for ISCO 3D level
+        if upskilling_ids is not None:
+            id_occ, idx_skill = upskilling_ids
+            occ_skills_mat.index = index
+
+            # find occ and skill ids of ESCO-level matrix
+            id_skill = occ_skills_mat.columns.values[idx_skill]
+            occ_subset = occ_skills_mat.index.get_level_values(3) == id_occ
+
+            # designate as essential skill
+            occ_skills_mat.loc[occ_subset, id_skill] = 1
+
+        # calculate esco-level similarity
         occ_sim = np.dot(occ_skills_mat.values, occ_skills_mat.values.transpose())
     elif osm_version == "weighted" and sim_metric == "shortage":
         occ_sim = pd.read_pickle(
@@ -155,24 +197,6 @@ def occ_sim_matrix_by_levels(
 
     if diagonal_zeros:
         np.fill_diagonal(occ_sim, 0)
-
-    # granularity levels
-    occ = esco.occupations
-    occ["esco_5_digit"] = occ["code"].str.slice(0, 6)
-    occ["isco_4_digit"] = occ["iscoGroup"]
-    occ["isco_3_digit"] = occ["iscoGroup"].astype(str).str.slice(0, 3)
-
-    # Create multiindex
-    arrays = [
-        occ.conceptUri.values,
-        occ.esco_5_digit.values,
-        occ.isco_4_digit.values,
-        occ.isco_3_digit.values,
-    ]
-    tuples = list(zip(*arrays))
-    index = pd.MultiIndex.from_tuples(
-        tuples, names=["concept_uri", "esco_5_digit", "isco_4_digit", "isco_3_digit"]
-    )
 
     # occ_sim.index = index
     df_occ_sim = pd.DataFrame(index=index, columns=index, data=occ_sim)
