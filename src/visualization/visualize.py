@@ -304,7 +304,7 @@ class EulfsVis(EulfsDs):
             # todo: fix hardcoded retrieval of column name identifiers
             cols_to_plot = gdf_sub.columns[
                 gdf_sub.columns.str.startswith("COEFF_")
-                & gdf_sub.columns.str.endswith("relative")
+                # & gdf_sub.columns.str.endswith("relative")
             ].to_list()
 
             self.plot_map(
@@ -332,7 +332,7 @@ class EulfsVis(EulfsDs):
                 # todo: fix hardcoded retrieval of column name identifiers
                 cols_to_plot = gdf_sub.columns[
                     gdf_sub.columns.str.startswith("COEFF_")
-                    & gdf_sub.columns.str.endswith("relative")
+                    # & gdf_sub.columns.str.endswith("relative")
                 ].to_list()
 
                 self.plot_map(
@@ -364,6 +364,7 @@ class EulfsVis(EulfsDs):
         n_cats=None,
         max_folder_name_length=50,
         additional_title_info=None,
+        save_data=True,
     ):
         # parse plotting params
         legend_kwds = {"label": cbar_label, "fraction": 0.03, "extend": "max"}
@@ -445,6 +446,12 @@ class EulfsVis(EulfsDs):
             plt.cla()
             plt.close(fig)
         plt.close()
+
+        if save_data:
+            gdf_sub.to_csv(
+                os.path.join(out_dir, "{}.csv".format(additional_title_info)),
+                encoding="utf-8",
+            )
 
     def create_industry_boxplots(
         self,

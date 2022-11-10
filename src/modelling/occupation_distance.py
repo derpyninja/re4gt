@@ -170,6 +170,7 @@ def occ_sim_matrix_by_levels(
 
         # calculate esco-level similarity
         occ_sim = np.dot(occ_skills_mat.values, occ_skills_mat.values.transpose())
+
     elif osm_version == "weighted" and sim_metric == "shortage":
         occ_sim = pd.read_pickle(
             os.path.join(

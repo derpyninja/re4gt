@@ -4,6 +4,10 @@ from scipy import stats
 from scipy.stats import kendalltau, pearsonr, spearmanr
 
 
+def rmse(predictions, targets):
+    return np.sqrt((np.nanmean(predictions - targets) ** 2))
+
+
 # correct if the population S.D. is expected to be equal for the two groups.
 def cohen_d(x, y):
     """
