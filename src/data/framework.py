@@ -1814,7 +1814,7 @@ class Esco(UsefulPaths):
 
         return occupations
 
-    # todo (minor): add COVID and automation-related data to agg process
+    # todo (minor): add COVID and automation-related data to agg rerun_simulations
     def aggregate_occ_data_by_isco(
         self,
         isco08_digits=[1, 2, 3, 4],

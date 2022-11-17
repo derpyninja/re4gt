@@ -10,6 +10,8 @@ from src import dictionaries, utils
 from src.data.framework import Esco
 from src.plotting_utils import discrete_cmap_with_manual_colors
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 useful_paths = utils.UsefulPaths()
 esco = Esco()
 
@@ -18,14 +20,19 @@ def plot_cooc_matrix_ordered_by_isco(
     version="unweighted",
     n_classes=10,
     cmap_type="Blues",
-    annotate_isco1d=True,
+    annotate_isco=1,
+    line_alpha=0.3,
+    linewidth=0.5,
     figsize=(16, 9),
     despine=False,
+    zoom=False,
+    zooming_margins=(0.1, 0.05),
     save_fig=True,
+    dpi=600,
     out_path=os.path.join(
         useful_paths.figure_dir,
         "occupation_skill_space",
-        "occ_sim_matrix_cooc_isco_groups_{version}_cmap_{cmap_type}{n_classes}.png",
+        "occ_sim_matrix_cooc_isco{isco_groups}_{version}_cmap_{cmap_type}{n_classes}.png",
     ),
 ):
     """
@@ -39,7 +46,7 @@ def plot_cooc_matrix_ordered_by_isco(
         N classes of discrete cmap.
     cmap_type : str
         Cmap name.
-    annotate_isco1d : bool
+    annotate_isco : int
         Whether ISCO-08 1-digit categories should be indicated.
     figsize : tuple
         Figure size.
@@ -72,10 +79,23 @@ def plot_cooc_matrix_ordered_by_isco(
     # plot
     cmap_new = discrete_cmap_with_manual_colors(cmap_type, n_classes)
 
-    plt.figure(figsize=figsize)
-    plt.imshow(sim_matrix[x, y], cmap=cmap_new, vmin=0, vmax=n_classes)
-    cbar = plt.colorbar(fraction=0.046, pad=0.04, orientation="vertical", extend="max")
-    cbar.ax.set_ylabel("Skills overlap [-]")
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # enables zooming
+    ax.use_sticky_edges = False
+
+    im = plt.imshow(sim_matrix[x, y], cmap=cmap_new, vmin=0, vmax=n_classes)
+    plt.colorbar(
+        im,
+        fraction=0.046,
+        pad=0.03,
+        shrink=0.6,
+        label="Skills overlap [-]",
+        orientation="vertical",
+        extend="max",
+    )
+
+    # cbar.ax.set_ylabel()
     plt.xlabel("Target occupations")
     plt.ylabel("Source occupations")
 
@@ -83,41 +103,70 @@ def plot_cooc_matrix_ordered_by_isco(
         sns.despine(left=True, bottom=True)
 
     # indicate isco major groups
-    if annotate_isco1d:
+    if annotate_isco is not None:
+        isco_level = annotate_isco
         rdict = {110: 0000, 210: 0000, 310: 0000}
-        reindex_isco_lvl1 = (
+        reindex_isco_lvl = (
             occ.sort_values("iscoGroup")
             .iscoGroup.replace(rdict)
             .astype(str)
-            .str.slice(0, 1)
+            .str.slice(0, isco_level)
             .astype(int)
         )
-        df_reindex_isco_lvl1 = reindex_isco_lvl1.diff().reset_index()
-        lvl1_boundaries = df_reindex_isco_lvl1.loc[df_reindex_isco_lvl1.iscoGroup == 1]
-        tick_locs = np.insert(lvl1_boundaries.index.values, [0, 9], [0, len(occ)])
 
+        # how many unique occupations do we need to consider?
+        unique_occs = reindex_isco_lvl.unique()
+
+        # where do we see a change in occupation category?
+        df_reindex_isco_lvl = reindex_isco_lvl.diff().reset_index()
+
+        # where do we see jumps in the occupation id?
+        lvl_boundaries = df_reindex_isco_lvl.loc[
+            df_reindex_isco_lvl.iscoGroup > 0
+        ]
+
+        # determine locations of tick boundaries
+        tick_locs = np.insert(
+            lvl_boundaries.index.values, [0, len(unique_occs) - 1], [0, len(occ)]
+        )
+
+        # determine locations of center ticks
         center_ticks = []
         for i in range(len(tick_locs) - 1):
             c = (tick_locs[i] + tick_locs[i + 1]) / 2
             center_ticks.append(c)
 
-        plt.xticks(
-            center_ticks, list(dictionaries.isco_lvl1_mapping.values()), rotation=90
-        )
-        plt.yticks(center_ticks, list(dictionaries.isco_lvl1_mapping.values()))
+        # plot ticks and labels
+        # plt.xticks(
+        #     center_ticks, list(dictionaries.isco_lvl1_mapping.values()), rotation=90
+        # )
+        # plt.yticks(center_ticks, list(dictionaries.isco_lvl1_mapping.values()))
 
-        for i in df_reindex_isco_lvl1.index.values:
-            if df_reindex_isco_lvl1.loc[i, "iscoGroup"] == 1:
-                plt.axvline(x=i, color="grey", linewidth=1, alpha=0.5, linestyle="--")
-                plt.axhline(y=i, color="grey", linewidth=1, alpha=0.5, linestyle="--")
+        # annotate lines
+        for i in df_reindex_isco_lvl.index.values:
+            if df_reindex_isco_lvl.loc[i, "iscoGroup"] > 0:
+                plt.axvline(
+                    x=i, color="grey", linewidth=linewidth, alpha=line_alpha, linestyle="--"
+                )
+                plt.axhline(
+                    y=i, color="grey", linewidth=linewidth, alpha=line_alpha, linestyle="--"
+                )
+
+        if zoom:
+            ax.margins(x=zooming_margins[0], y=zooming_margins[1])
 
     plt.tight_layout()
 
     if save_fig:
         plt.savefig(
-            out_path.format(version=version, cmap_type=cmap_type, n_classes=n_classes),
+            out_path.format(
+                isco_groups=annotate_isco,
+                version=version,
+                cmap_type=cmap_type,
+                n_classes=n_classes,
+            ),
             bbox_inches="tight",
-            dpi=300,
+            dpi=dpi,
         )
     else:
         plt.show()
@@ -267,16 +316,23 @@ def plot_occ_sim_matrix_ordered_by_isco(
 
 
 if __name__ == "__main__":
-    sns.axes_style("ticks")
-    sns.plotting_context("paper", font_scale=1)
+    with sns.axes_style("ticks"), sns.plotting_context("notebook", font_scale=1.2):
 
-    # plot_cooc_matrix_ordered_by_isco(version="unweighted", despine=True,
-    #                                     cmap_type="Blues", n_classes=20)
-    # plot_cooc_matrix_ordered_by_isco(version="weighted", despine=True,
-    #                                     cmap_type="Blues", n_classes=20)
+        # plot_cooc_matrix_ordered_by_isco(version="unweighted", despine=True,
+        #                                  cmap_type="Blues", n_classes=20)
+        plot_cooc_matrix_ordered_by_isco(
+            version="weighted",
+            despine=True,
+            cmap_type="Blues",
+            n_classes=20,
+            annotate_isco=3,
+            dpi=600,
+            zooming_margins=(-0.45, -0.45),
+            zoom=True
+        )
 
-    plot_occ_sim_matrix_ordered_by_isco(sim_metric="shortage", cmap_type="Reds")
-    plot_occ_sim_matrix_ordered_by_isco(sim_metric="excess", cmap_type="Blues")
-    plot_occ_sim_matrix_ordered_by_isco(
-        sim_metric="shortage_excess_avg", cmap_type="Blues"
-    )
+        # plot_occ_sim_matrix_ordered_by_isco(sim_metric="shortage", cmap_type="Reds")
+        # plot_occ_sim_matrix_ordered_by_isco(sim_metric="excess", cmap_type="Blues")
+        # plot_occ_sim_matrix_ordered_by_isco(
+        #     sim_metric="shortage_excess_avg", cmap_type="Blues"
+        # )

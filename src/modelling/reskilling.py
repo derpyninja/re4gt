@@ -118,16 +118,17 @@ class ReskillingPathways:
         # note: actually this should always be set to False
         self.osim_diag_zeros = False
 
-        self.dirname_out = "{}_sim_{}_opt_{}"
+        self.dirname_out = "{}_{}_opt_{}"
+        self.dirname_out_reg = "{sim_version}_{opt_target}-opt_{reg_constraint}_{year}"
 
         # possible simulation options and corresponding folder names
         self.simulation_name = {
             None: "baseline",
-            "random": "upsk_random",
-            "computer_literacy": "upsk_digital",
-            "coreness_weighted": "upsk_coreWeight",
-            "coreness_percentile": "upsk_corePctl",
-            "optimal": "upsk_optimal",
+            "random": "reskill-random",
+            "computer_literacy": "reskill-digital",
+            "coreness_weighted": "reskill-coreWeight",
+            "coreness_percentile": "reskill-corePctl",
+            "optimal": "reskill-optimal",
         }
 
         # checks
@@ -177,11 +178,13 @@ class ReskillingPathways:
                 "classifications",
                 "NACE_REV2_1d_section_codes_short_names.csv",
             ),
-            index_col=0,
+            # index_col=0,
         )
 
         self.nace_mapping = dict(
-            zip(self.nace_labels.NACE1D_label, self.nace_labels.NACE1D_label_short)
+            zip(
+                self.nace_labels["NACE1D_label"], self.nace_labels["NACE1D_label_short"]
+            )
         )
 
         # occupation-specific skill that unlocks most new transitions
@@ -804,9 +807,9 @@ class ReskillingPathways:
         level : str
             Granularity level
         countries : list of str
-            Countries to process.
+            Countries to rerun_simulations.
         scenarios : list of str
-            Phase-out scenarios to process.
+            Phase-out scenarios to rerun_simulations.
         reskilling : str
             Mode of reskilling (See documentation of self.reskill). One of
             None, "random", "computer_literacy", "coreness_weighted",
@@ -883,12 +886,12 @@ class ReskillingPathways:
                 df_transition_pool.loc[
                     df_transition_pool["REGIONW"].isna(), "NUTS_ID"
                 ] = df_transition_pool.loc[
-                        df_transition_pool["REGIONW"].isna(), "COUNTRYW"
-                    ].astype(
+                    df_transition_pool["REGIONW"].isna(), "COUNTRYW"
+                ].astype(
                     str
                 ) + df_transition_pool.loc[
-                        df_transition_pool["REGIONW"].isna(), "REGION"
-                    ].astype(
+                    df_transition_pool["REGIONW"].isna(), "REGION"
+                ].astype(
                     str
                 )
 
@@ -1243,9 +1246,9 @@ class ReskillingPathways:
         level : str
             Granularity level
         countries : list of str
-            Countries to process.
+            Countries to rerun_simulations.
         scenarios : list of str
-            Phase-out scenarios to process.
+            Phase-out scenarios to rerun_simulations.
         reskilling : str
             Mode of reskilling (See documentation of self.reskill). One of
             None, "random", "computer_literacy", "coreness_weighted",
@@ -1291,8 +1294,14 @@ class ReskillingPathways:
         print("Viability thresholds:", q_viable, q_highly_viable)
 
         # create output dir and fnames
-        dirname = self.dirname_out.format(
-            self.simulation_name[reskilling], transition_optimisation, self.year
+        reg_constraint_str = "regC" if regional_constraint else "no-regC"
+
+        # format: "{sim_version}_{opt_target}-opt_{reg_constraint}_{year}"
+        dirname = self.dirname_out_reg.format(
+            sim_version=self.simulation_name[reskilling],
+            opt_target=transition_optimisation,
+            reg_constraint=reg_constraint_str,
+            year=self.year,
         )
         fname = "{}.pkl".format(dirname)
         target_dir = os.path.join(out_dir, dirname)
@@ -1302,8 +1311,11 @@ class ReskillingPathways:
         # todo: read into class variable
         jobs_by_regions_countries = pd.read_pickle(
             os.path.join(
-                "C:", os.sep, "eurostat_data", "processed",
-                "lfs_employment_fluctuations_abs_1998_2019.pkl"
+                "C:",
+                os.sep,
+                "eurostat_data",
+                "processed",
+                "lfs_employment_fluctuations_abs_1998_2019.pkl",
             )
         )
 
@@ -1446,7 +1458,10 @@ class ReskillingPathways:
 
                         # find occ label for code
                         label_code_mapping = self.get_occs()
-                        search_label = label_code_mapping.loc[label_code_mapping["code"] == src_occ_group, "preferredLabel"].values[0]
+                        search_label = label_code_mapping.loc[
+                            label_code_mapping["code"] == src_occ_group,
+                            "preferredLabel",
+                        ].values[0]
 
                         # -------------------------------------------------------------
                         # Reskilling step (optional)
@@ -1479,10 +1494,20 @@ class ReskillingPathways:
                             #         list(self.coal_occupations.values())
                             #     )
                             # ),
-                            "coal": (target_occs_filtered["category_sl"].isin(self.target_cats)),
-                            "brown": (target_occs_filtered["category_sl"].isin(self.target_cats)),
+                            "coal": (
+                                target_occs_filtered["category_sl"].isin(
+                                    self.target_cats
+                                )
+                            ),
+                            "brown": (
+                                target_occs_filtered["category_sl"].isin(
+                                    self.target_cats
+                                )
+                            ),
                             "brown_techchange": (
-                                target_occs_filtered["category_slt"].isin(self.target_cats)
+                                target_occs_filtered["category_slt"].isin(
+                                    self.target_cats
+                                )
                             ),
                         }
 
@@ -1552,31 +1577,34 @@ class ReskillingPathways:
                                         target = target_occs_filtered.iloc[rank - 1, :]
 
                                         # determine target job employment based on coeff
-                                        print(country, nuts_code)
-                                        print(jobs_by_region)
-                                        print(target)
-                                        print(jobs_by_region.loc[
-                                                  jobs_by_region["ISCO3D"] == target[
-                                                      "code"]])
+                                        # print(country, nuts_code)
+                                        # print(jobs_by_region)
+                                        # print(target)
+                                        # print(jobs_by_region.loc[
+                                        #           jobs_by_region["ISCO3D"] == target[
+                                        #               "code"]])
 
                                         target_job_availability = jobs_by_region.loc[
                                             jobs_by_region["ISCO3D"] == target["code"],
-                                            target_job_availability_coeff
+                                            target_job_availability_coeff,
                                         ].values[0]
 
                                         # if the target occupation can regionally absorb all
                                         # transitioning workers related to the survey
                                         # observation, every worker chooses this transition
-                                        if target_job_availability > src_worker[coeff_weight]:
+                                        if (
+                                            target_job_availability
+                                            > src_worker[coeff_weight]
+                                        ):
 
                                             # target occupation
                                             src_worker["transition_viable"] = True
                                             src_worker["transition_target"] = target[
                                                 "preferredLabel"
                                             ]
-                                            src_worker["transition_target_code"] = target[
-                                                "code"
-                                            ]
+                                            src_worker[
+                                                "transition_target_code"
+                                            ] = target["code"]
                                             src_worker["transition_target_rank"] = rank
                                             src_worker["target_category"] = target[
                                                 self.category_versions[scenario]
@@ -1592,24 +1620,29 @@ class ReskillingPathways:
                                             )
 
                                             # wage difference
-                                            src_worker["earnings_delta_closest_switch"] = (
+                                            src_worker[
+                                                "earnings_delta_closest_switch"
+                                            ] = (
                                                 target["annual_earnings"]
                                                 - src_worker["annual_earnings"]
                                             )
                                             src_worker[
                                                 "earnings_delta_closest_switch_sum"
                                             ] = (
-                                                src_worker["earnings_delta_closest_switch"]
+                                                src_worker[
+                                                    "earnings_delta_closest_switch"
+                                                ]
                                                 * src_worker[coeff_weight]
                                             )
 
                                             # update post-transition job availability
                                             mask = (
-                                                jobs_by_region["ISCO3D"] == target["code"]
+                                                jobs_by_region["ISCO3D"]
+                                                == target["code"]
                                             )
-                                            jobs_by_region.loc[mask, target_job_availability_coeff] -= src_worker[
-                                                coeff_weight
-                                            ]
+                                            jobs_by_region.loc[
+                                                mask, target_job_availability_coeff
+                                            ] -= src_worker[coeff_weight]
 
                                             # update results
                                             transition_number_data.append(src_worker)
@@ -1632,7 +1665,9 @@ class ReskillingPathways:
                                             if rank > n_targets:
                                                 # save results
                                                 src_worker["transition_viable"] = False
-                                                src_worker["transition_target_rank"] = rank
+                                                src_worker[
+                                                    "transition_target_rank"
+                                                ] = rank
 
                                                 # lost wage
                                                 src_worker[
@@ -1647,7 +1682,9 @@ class ReskillingPathways:
                                                     * src_worker[coeff_weight]
                                                 )
 
-                                                transition_number_data.append(src_worker)
+                                                transition_number_data.append(
+                                                    src_worker
+                                                )
                                             continue
                             else:
                                 # without regional constraints all workers with the same
@@ -1658,9 +1695,7 @@ class ReskillingPathways:
                                 src_workers["transition_target"] = target[
                                     "preferredLabel"
                                 ]
-                                src_workers["transition_target_code"] = target[
-                                    "code"
-                                ]
+                                src_workers["transition_target_code"] = target["code"]
                                 src_workers["transition_target_rank"] = np.nan
                                 src_workers["target_category"] = target[
                                     self.category_versions[scenario]
@@ -1672,20 +1707,18 @@ class ReskillingPathways:
                                 ] = target_occs_filtered.shape[0]
 
                                 src_workers["n_viable_transitions_sum"] = (
-                                        src_workers["n_viable_transitions"]
-                                        * src_workers[coeff_weight]
+                                    src_workers["n_viable_transitions"]
+                                    * src_workers[coeff_weight]
                                 )
 
                                 # wage difference
                                 src_workers["earnings_delta_closest_switch"] = (
-                                        target["annual_earnings"].values[0]
-                                        - src_workers["annual_earnings"]
+                                    target["annual_earnings"].values[0]
+                                    - src_workers["annual_earnings"]
                                 )
-                                src_workers[
-                                    "earnings_delta_closest_switch_sum"
-                                ] = (
-                                        src_workers["earnings_delta_closest_switch"]
-                                        * src_workers[coeff_weight]
+                                src_workers["earnings_delta_closest_switch_sum"] = (
+                                    src_workers["earnings_delta_closest_switch"]
+                                    * src_workers[coeff_weight]
                                 )
 
                                 # add one by one (workaround)
@@ -2064,22 +2097,33 @@ class ReskillingPathways:
         base_dir=os.path.join(useful_paths.figure_dir, "reskilling_simulation"),
         year=2019,
         transition_optimisation="wage",
-        version="baseline",
+        reskilling_version="baseline",
         show_annotations=False,
         show_map_boxplots=False,
         show_plots=False,
         cbar_fraction=0.025,
         vmax_transitions=8,
         vmax_wages=100,
-        title_fontsize="normal",
+        title_fontsize="small",
         save_tables=True,
+        industry_subset_paper=True,
+        regional_constraint=True,
     ):
 
         # params
         xmin, xmax, ymin, ymax = bbox_eu_epsg_3035
 
-        # path of in-file
-        dirname = self.dirname_out.format(version, transition_optimisation, year)
+        # construct path of in-file
+        reg_constraint_str = "regC" if regional_constraint else "no-regC"
+
+        # format: "{sim_version}_{opt_target}-opt_{reg_constraint}_{year}"
+        dirname = self.dirname_out_reg.format(
+            sim_version=reskilling_version,
+            opt_target=transition_optimisation,
+            reg_constraint=reg_constraint_str,
+            year=self.year,
+        )
+
         utils.ccdir(os.path.join(base_dir, dirname))
         fname = "{}.pkl".format(dirname)
 
@@ -2131,14 +2175,21 @@ class ReskillingPathways:
             # ---------------------------------------------------------------------
             if not show_map_boxplots:
                 fig, (ax1, ax2) = plt.subplots(
-                    nrows=1, ncols=2, figsize=(20, 20),
+                    nrows=1,
+                    ncols=2,
+                    figsize=(20, 20),
                     gridspec_kw={"width_ratios": [0.5, 0.5]},
                 )
             else:
                 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(
-                    nrows=2, ncols=2, figsize=(20, 15),
-                    gridspec_kw={"width_ratios": [0.5, 0.5], 'height_ratios': [0.9, 0.1],
-                                 "hspace": 0},
+                    nrows=2,
+                    ncols=2,
+                    figsize=(20, 15),
+                    gridspec_kw={
+                        "width_ratios": [0.5, 0.5],
+                        "height_ratios": [0.9, 0.1],
+                        "hspace": 0,
+                    },
                 )
 
             cmap_earnings = plt.get_cmap("coolwarm_r", (vmax_wages / 10) * 2)
@@ -2256,24 +2307,31 @@ class ReskillingPathways:
 
             if show_map_boxplots:
                 # ax3: distribution across regions (transitions)
-                sns.boxplot(x=gdf_transition_numbers_by_nuts["n_viable_transitions_rel"], ax=ax3)
+                sns.boxplot(
+                    x=gdf_transition_numbers_by_nuts["n_viable_transitions_rel"], ax=ax3
+                )
 
                 # ax4: distribution across regions (earnings)
-                sns.boxplot(x=gdf_transition_numbers_by_nuts["earnings_delta_closest_switch_sum_mio"],
-                            ax=ax4)
+                sns.boxplot(
+                    x=gdf_transition_numbers_by_nuts[
+                        "earnings_delta_closest_switch_sum_mio"
+                    ],
+                    ax=ax4,
+                )
 
             # layout
             fig.suptitle(
-                "Country: {country}\n Year: {year}\n Scenario: {scenario}\n Workers: {n_workers}\n N: {n_obs}\n Optimise: {optimise}\n Version: {version}".format(
-                    version=version,
+                "Country: {country}\n Year: {year}\n Scenario: {scenario}\n Workers: {n_workers}\n N: {n_obs}\n Optimise: {optimise}\n Simulation: {version}\n Regional: {regional_constraint}".format(
+                    version=reskilling_version,
                     scenario=scenario.capitalize(),
                     country="EU",
                     year=year,
                     optimise=transition_optimisation,
                     n_workers=int(n_workers),
                     n_obs=n_obs,
+                    regional_constraint=regional_constraint,
                 ),
-                fontsize=title_fontsize
+                fontsize=title_fontsize,
             )
             fig.tight_layout()
             fig.subplots_adjust(top=1.4)
@@ -2319,6 +2377,15 @@ class ReskillingPathways:
             df_transition_numbers = df_transition_numbers.replace(
                 to_replace={"NACE1D_label": self.nace_mapping}
             )
+
+            # subset relevant industries for paper
+            if industry_subset_paper:
+                industry_subset = self.nace_labels.loc[
+                    self.nace_labels["paper_selection"] == True, "NACE1D_label_short"
+                ]
+                df_transition_numbers = df_transition_numbers.loc[
+                    df_transition_numbers["NACE1D_label"].isin(industry_subset)
+                ]
 
             for i, var in enumerate(vars):
                 fig, (ax1, ax2) = plt.subplots(
@@ -2394,14 +2461,15 @@ class ReskillingPathways:
                 fig.text(0.7, 0.0, var_labels[i], ha="center")
 
                 fig.suptitle(
-                    "Country: {country} | Year: {year} | Scenario: {scenario} | Workers: {n_workers} | N: {n_obs} | Optimise: {optimise} | Version: {version}".format(
-                        version=version,
+                    "Country: {country} | Year: {year} | Scenario: {scenario} | Workers: {n_workers} | N: {n_obs} | Optimise: {optimise} | Version: {version} | Regional: {regional_constraint}".format(
+                        version=reskilling_version,
                         scenario=scenario.capitalize(),
                         country="EU",
                         year=year,
                         optimise=transition_optimisation,
                         n_workers=int(n_workers),
                         n_obs=n_obs,
+                        regional_constraint=regional_constraint,
                     ),
                     fontsize=title_fontsize,
                 )
@@ -2445,31 +2513,68 @@ class ReskillingPathways:
 
 if __name__ == "__main__":
     import time
+    import timeit
     from src.data.lfs import EuLfs
+
+    # re-run simulations & plot or plot only?
+    rerun_simulations = False
 
     # ---------------------------------------------------------------------
     # Input data
     # ---------------------------------------------------------------------
 
-    # EU-LFS data
-    config = utils.load_config(
-        os.path.join(useful_paths.config_dir, "eu_lfs_config.yml")
-    )
-    lfs = EuLfs(config=config)
+    if rerun_simulations:
+        # EU-LFS data
+        config = utils.load_config(
+            os.path.join(useful_paths.config_dir, "eu_lfs_config.yml")
+        )
+        lfs = EuLfs(config=config)
 
-    lfs_data = lfs.read_preprocessed_file(
-        year=2019,
-        input_fname_lfs="eu_lfs_merged_{year}_with_final_unweighted_shares_and_earnings_incdecil_imputed",
-    )
+        lfs_data = lfs.read_preprocessed_file(
+            year=2019,
+            input_fname_lfs="eu_lfs_merged_{year}_with_final_unweighted_shares_and_earnings_incdecil_imputed",
+        )
 
-    # ---------------------------------------------------------------------
-    # Simulate baseline for coal phase-out scenario in Germany
-    # ---------------------------------------------------------------------
+        # todo: move to lfs preprocessing chain
+        # add required categories
+        cats_regionw = lfs_data["REGIONW"].cat.categories.values
+        cats_region = lfs_data["REGION"].cat.categories.values
+
+        placeholder_cat = "99"
+
+        new_cats_regionw = list(set(cats_region) - set(cats_regionw))
+        new_cats_region = list(set(cats_regionw) - set(cats_region))
+
+        new_cats_regionw.append(placeholder_cat)
+        new_cats_region.append(placeholder_cat)
+
+        lfs_data["REGIONW"] = lfs_data["REGIONW"].cat.add_categories(new_cats_regionw)
+        lfs_data["REGION"] = lfs_data["REGION"].cat.add_categories(new_cats_region)
+
+        # fill nans in regionw with region
+        lfs_data["REGIONW"] = lfs_data["REGIONW"].fillna(lfs_data["REGION"])
+
+        # fill remaining nans with placeholder
+        lfs_data["REGIONW"] = lfs_data["REGIONW"].fillna("99")
+        lfs_data["REGION"] = lfs_data["REGION"].fillna("99")
+
+        # update nuts id
+        lfs_data["NUTS_ID"] = lfs_data["COUNTRYW"].astype("string") + lfs_data[
+            "REGIONW"
+        ].astype("string")
+    else:
+        lfs_data = None
+
+    # initialise class
     rp = ReskillingPathways(
         osm_version="weighted", sim_metric="cooc", lfs_data=lfs_data, year=2019
     )
 
-    # parameters for simulation
+    # ---------------------------------------------------------------------
+    # Simulation parameters
+    # ---------------------------------------------------------------------
+
+    # countries to analyse
     countries = [
         "AT",
         "BE",
@@ -2500,53 +2605,84 @@ if __name__ == "__main__":
         "UK",
     ]
 
-    scenarios = ["brown_techchange"]  # ["coal", "brown_techchange", "brown"]
-    upskilling_modes = [
+    # transition pools to analyse
+    scenarios = ["coal", "brown_techchange", "brown"]
+
+    # reskilling options to consider
+    reskilling_modes = [
         None,
-        # "random",
-        # "computer_literacy",
-        # "coreness_weighted",
+        "random",
+        "coreness_weighted",
+        "computer_literacy",
         # "coreness_percentile",
-        # "optimal",
+        "optimal",
     ]
+
+    # optimisation target for job transitions
     optimise = "wage"
 
-    # thresholds used for first set of results.
-    # first set is lower than the second, percentile-based thresholds of (2.25, 7.5).
-    transition_thresholds = [None]  # [(1.616368047779022, 6.500853535353546), None]
-    shortcuts = ["v2_reg_thresh_high"]  # ["v2_reg_thresh_low", "v2_reg_thresh_high"]
+    # viability thresholds
+    transition_thresholds = [
+        #(1.616368047779022, 6.500853535353546),
+        None,
+        #(3.68, 10.80),
+    ]
+    shortcuts = [
+        #"thresh-low",
+        "thresh-perc",
+        #"thresh-emp"
+    ]
+
+    # consideration of regional mobility constraints
+    regional_constraints = [False, True]
+
+    # name mapping
     processing_dict = dict(zip(transition_thresholds, shortcuts))
 
+    # ---------------------------------------------------------------------
+    # Processing loop
+    # ---------------------------------------------------------------------
+    start = timeit.default_timer()
     for transition_threshold, shortcut in processing_dict.items():
         # results storage
         results_dir = os.path.join(
-            useful_paths.figure_dir, "reskilling_simulation_{}".format(shortcut)
+            useful_paths.figure_dir, "reskilling_final_{}".format(shortcut)
         )
+        for regional_constraint in regional_constraints:
+            # run simulations for each reskilling mode
+            for reskilling_mode in reskilling_modes:
+                print(reskilling_mode)
+                t0 = time.time()
 
-        # run simulations for each reskilling mode
-        for upskilling_mode in upskilling_modes:
-            print(upskilling_mode)
-            t0 = time.time()
-            # simulate
-            simulation_results = rp.simulate_regional(
-                level="isco_3_digit",
-                countries=countries,
-                scenarios=scenarios,
-                max_frac=1,
-                transition_optimisation=optimise,
-                reskilling=upskilling_mode,
-                mask_diagonal=True,
-                transition_thresholds=transition_threshold,
-                out_dir=results_dir,
-            )
+                if rerun_simulations:
+                    simulation_results = rp.simulate_regional(
+                        level="isco_3_digit",
+                        countries=countries,
+                        scenarios=scenarios,
+                        transition_optimisation=optimise,
+                        reskilling=reskilling_mode,
+                        region_constraints=regional_constraint,
+                        mask_diagonal=True,
+                        transition_thresholds=transition_threshold,
+                        out_dir=results_dir,
+                    )
+                else:
+                    simulation_results = None
 
-            # plot regional & sectoral distributions of transitions and earnings losses
-            rp.visualise_simulation_results_eu(
-                simulation_results=simulation_results,
-                transition_optimisation=optimise,
-                version=rp.simulation_name[upskilling_mode],
-                base_dir=results_dir,
-            )
+                # regional & sectoral distributions of transitions and earnings losses
+                rp.visualise_simulation_results_eu(
+                    simulation_results=simulation_results,
+                    transition_optimisation=optimise,
+                    reskilling_version=rp.simulation_name[reskilling_mode],
+                    regional_constraint=regional_constraint,
+                    base_dir=results_dir,
+                    vmax_wages=100,
+                    vmax_transitions=8,
+                    title_fontsize="small",
+                    cbar_fraction=0.025,
+                )
 
-            t1 = time.time()
-            print("Elapsed time: {} min".format((t1 - t0) / 60))
+
+    # Your statements here
+    stop = timeit.default_timer()
+    print('Time (min): ', (stop - start) / 60)
