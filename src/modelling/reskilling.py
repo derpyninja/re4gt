@@ -2192,10 +2192,6 @@ class ReskillingPathways:
                     },
                 )
 
-            cmap_earnings = plt.get_cmap("coolwarm_r", (vmax_wages / 10) * 2)
-            cmap_earnings.set_over("darkblue")
-            cmap_earnings.set_under("darkred")
-
             cmap_transitions = plotting_utils.discrete_cmap_with_manual_colors(
                 cmap_type="Blues",
                 n_classes=vmax_transitions,
@@ -2250,6 +2246,12 @@ class ReskillingPathways:
                 gdf_transition_numbers_by_nuts["CNTR_CODE"].isin(cntr_missing),
                 "earnings_delta_closest_switch_sum_mio",
             ] = np.nan
+
+            # cmap
+            vmax_wages = gdf_transition_numbers_by_nuts["earnings_delta_closest_switch_sum_mio"].abs().quantile(q=0.98)
+            cmap_earnings = plt.get_cmap("coolwarm_r", (vmax_wages / 10) * 2)
+            cmap_earnings.set_over("darkblue")
+            cmap_earnings.set_under("darkred")
 
             # ax2: earnings losses
             gdf_transition_numbers_by_nuts.plot(
@@ -2611,11 +2613,11 @@ if __name__ == "__main__":
     # reskilling options to consider
     reskilling_modes = [
         None,
-        "random",
-        "coreness_weighted",
-        "computer_literacy",
-        # "coreness_percentile",
-        "optimal",
+        # "random",
+        # "coreness_weighted",
+        # "computer_literacy",
+        # # "coreness_percentile",
+        # "optimal",
     ]
 
     # optimisation target for job transitions
