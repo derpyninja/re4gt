@@ -121,9 +121,7 @@ def plot_cooc_matrix_ordered_by_isco(
         df_reindex_isco_lvl = reindex_isco_lvl.diff().reset_index()
 
         # where do we see jumps in the occupation id?
-        lvl_boundaries = df_reindex_isco_lvl.loc[
-            df_reindex_isco_lvl.iscoGroup > 0
-        ]
+        lvl_boundaries = df_reindex_isco_lvl.loc[df_reindex_isco_lvl.iscoGroup > 0]
 
         # determine locations of tick boundaries
         tick_locs = np.insert(
@@ -146,10 +144,18 @@ def plot_cooc_matrix_ordered_by_isco(
         for i in df_reindex_isco_lvl.index.values:
             if df_reindex_isco_lvl.loc[i, "iscoGroup"] > 0:
                 plt.axvline(
-                    x=i, color="grey", linewidth=linewidth, alpha=line_alpha, linestyle="--"
+                    x=i,
+                    color="grey",
+                    linewidth=linewidth,
+                    alpha=line_alpha,
+                    linestyle="--",
                 )
                 plt.axhline(
-                    y=i, color="grey", linewidth=linewidth, alpha=line_alpha, linestyle="--"
+                    y=i,
+                    color="grey",
+                    linewidth=linewidth,
+                    alpha=line_alpha,
+                    linestyle="--",
                 )
 
         if zoom:
@@ -328,7 +334,7 @@ if __name__ == "__main__":
             annotate_isco=3,
             dpi=600,
             zooming_margins=(-0.45, -0.45),
-            zoom=True
+            zoom=True,
         )
 
         # plot_occ_sim_matrix_ordered_by_isco(sim_metric="shortage", cmap_type="Reds")

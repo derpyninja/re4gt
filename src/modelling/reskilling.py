@@ -2108,6 +2108,7 @@ class ReskillingPathways:
         save_tables=True,
         industry_subset_paper=True,
         regional_constraint=True,
+        combine_vars_in_sector_plot=True,
     ):
 
         # params
@@ -2248,7 +2249,11 @@ class ReskillingPathways:
             ] = np.nan
 
             # cmap
-            vmax_wages = gdf_transition_numbers_by_nuts["earnings_delta_closest_switch_sum_mio"].abs().quantile(q=0.98)
+            vmax_wages = (
+                gdf_transition_numbers_by_nuts["earnings_delta_closest_switch_sum_mio"]
+                .abs()
+                .quantile(q=0.98)
+            )
             cmap_earnings = plt.get_cmap("coolwarm_r", (vmax_wages / 10) * 2)
             cmap_earnings.set_over("darkblue")
             cmap_earnings.set_under("darkred")
@@ -2357,8 +2362,10 @@ class ReskillingPathways:
                 plt.close(fig)
 
             # save numbers
+            vars = ["earnings_delta_closest_switch_sum_mio", "n_viable_transitions_rel"]
             if save_tables:
-                gdf_transition_numbers_by_nuts.to_csv(
+                res = gdf_transition_numbers_by_nuts[vars].describe()
+                res.to_csv(
                     os.path.join(
                         base_dir,
                         dirname,
@@ -2389,7 +2396,118 @@ class ReskillingPathways:
                     df_transition_numbers["NACE1D_label"].isin(industry_subset)
                 ]
 
-            for i, var in enumerate(vars):
+            if not combine_vars_in_sector_plot:
+                for i, var in enumerate(vars):
+                    fname_snippet = var_fname[i]
+                    fig, (ax1, ax2) = plt.subplots(
+                        ncols=2,
+                        figsize=(10, 5),
+                        sharey=True,
+                        sharex=False,
+                        gridspec_kw={"width_ratios": [0.7, 0.3]},
+                    )
+
+                    y_order = (
+                        df_transition_numbers.groupby("NACE1D_label")
+                        .aggregate({var: "median"})
+                        .sort_values(by=var, ascending=False)
+                        .index.values
+                    )
+
+                    # left
+                    if var_fname[i] == "earnings":
+                        sns.boxplot(
+                            data=df_transition_numbers,
+                            x=var,
+                            y="NACE1D_label",
+                            orient="h",
+                            showfliers=False,
+                            showmeans=True,
+                            meanprops={
+                                "marker": "^",
+                                "markerfacecolor": "white",
+                                "markeredgecolor": "black",
+                                "markersize": "5",
+                            },
+                            order=y_order,
+                            palette="RdYlGn_r",
+                            ax=ax1,
+                        )
+
+                        # right
+                        sns.barplot(
+                            data=df_transition_numbers,
+                            x=var,
+                            y="NACE1D_label",
+                            orient="h",
+                            estimator=np.sum,
+                            ci=None,
+                            order=y_order,
+                            palette="RdYlGn_r",
+                            ax=ax2,
+                        )
+                        ax2.bar_label(
+                            ax2.containers[-1], fmt="%.0f", label_type="center"
+                        )
+                    elif var_fname[i] == "transitions":
+                        sns.barplot(
+                            data=df_transition_numbers,
+                            x=var,
+                            y="NACE1D_label",
+                            orient="h",
+                            estimator=np.mean,
+                            ci="sd",
+                            order=y_order,
+                            palette="RdYlGn_r",
+                            ax=ax1,
+                        )
+                        ax1.axvline(1, linestyle="-", color="lightcoral", zorder=0)
+                        ax1.set_xlim(0)
+
+                    for ax in [ax1, ax2]:
+                        ax.axvline(0, linestyle="-", color="grey", zorder=0)
+                        ax.grid(linestyle=":")
+                        ax.set_xlabel(None)
+                        ax.set_ylabel(None)
+
+                    # labelling
+                    fig.text(0.7, 0.0, var_labels[i], ha="center")
+
+                    fig.suptitle(
+                        "Country: {country} | Year: {year} | Scenario: {scenario} | Workers: {n_workers} | N: {n_obs} | Optimise: {optimise} | Version: {version} | Regional: {regional_constraint}".format(
+                            version=reskilling_version,
+                            scenario=scenario.capitalize(),
+                            country="EU",
+                            year=year,
+                            optimise=transition_optimisation,
+                            n_workers=int(n_workers),
+                            n_obs=n_obs,
+                            regional_constraint=regional_constraint,
+                        ),
+                        fontsize=title_fontsize,
+                    )
+                    fig.tight_layout()
+                    fig.subplots_adjust(top=0.9)
+
+                    # layout
+                    sns.despine()
+
+                    # save
+                    fname = "results_{}_{}_{}_{}_{}.png".format(
+                        "EU", year, "sectoral", fname_snippet, scenario
+                    )
+                    plt.savefig(
+                        os.path.join(
+                            base_dir,
+                            dirname,
+                            fname,
+                        ),
+                        dpi=300,
+                        bbox_inches="tight",
+                    )
+            else:
+                fname_snippet = "combined"
+                var = "n_viable_transitions"
                 fig, (ax1, ax2) = plt.subplots(
                     ncols=2,
                     figsize=(10, 5),
@@ -2400,68 +2518,51 @@ class ReskillingPathways:
 
                 y_order = (
                     df_transition_numbers.groupby("NACE1D_label")
-                    .aggregate({var: "median"})
+                    .aggregate({var: "mean"})
                     .sort_values(by=var, ascending=False)
                     .index.values
                 )
 
                 # left
-                if var_fname[i] == "earnings":
-                    sns.boxplot(
-                        data=df_transition_numbers,
-                        x=var,
-                        y="NACE1D_label",
-                        orient="h",
-                        showfliers=False,
-                        showmeans=True,
-                        meanprops={
-                            "marker": "^",
-                            "markerfacecolor": "white",
-                            "markeredgecolor": "black",
-                            "markersize": "5",
-                        },
-                        order=y_order,
-                        palette="RdYlGn_r",
-                        ax=ax1,
-                    )
+                sns.barplot(
+                    data=df_transition_numbers,
+                    x="n_viable_transitions",
+                    y="NACE1D_label",
+                    orient="h",
+                    estimator=np.mean,
+                    ci="sd",
+                    order=y_order,
+                    palette="RdYlGn_r",
+                    ax=ax1,
+                )
+                ax1.bar_label(
+                    ax1.containers[-1], fmt="%.1f", label_type="center", color="white"
+                )
+                ax1.axvline(1, linestyle="-", color="lightcoral", zorder=0)
+                ax1.set_xlim(0)
+                ax1.set_xlabel("Transitions per at-risk worker [-]")
 
-                    # right
-                    sns.barplot(
-                        data=df_transition_numbers,
-                        x=var,
-                        y="NACE1D_label",
-                        orient="h",
-                        estimator=np.sum,
-                        ci=None,
-                        order=y_order,
-                        palette="RdYlGn_r",
-                        ax=ax2,
-                    )
-                    ax2.bar_label(ax2.containers[-1], fmt="%.0f", label_type="center")
-                elif var_fname[i] == "transitions":
-                    sns.barplot(
-                        data=df_transition_numbers,
-                        x=var,
-                        y="NACE1D_label",
-                        orient="h",
-                        estimator=np.mean,
-                        ci="sd",
-                        order=y_order,
-                        palette="RdYlGn_r",
-                        ax=ax1,
-                    )
-                    ax1.axvline(1, linestyle="-", color="lightcoral", zorder=0)
-                    ax1.set_xlim(0)
+                # right
+                sns.barplot(
+                    data=df_transition_numbers,
+                    x="earnings_delta_closest_switch_sum_mio",
+                    y="NACE1D_label",
+                    orient="h",
+                    estimator=np.sum,
+                    ci=None,
+                    order=y_order,
+                    palette="RdYlGn_r",
+                    ax=ax2,
+                )
+                ax2.bar_label(ax2.containers[-1], fmt="%.0f", label_type="center")
+                ax2.set_xlabel("$\Delta$ Annual earnings [M€ (2019)]")
+                ax2.axvline(0, linestyle="-", color="grey", zorder=0)
 
                 for ax in [ax1, ax2]:
-                    ax.axvline(0, linestyle="-", color="grey", zorder=0)
-                    ax.grid(linestyle=":")
-                    ax.set_xlabel(None)
+                    ax.grid(linestyle=":", axis="x")
                     ax.set_ylabel(None)
 
                 # labelling
-                fig.text(0.7, 0.0, var_labels[i], ha="center")
-
                 fig.suptitle(
                     "Country: {country} | Year: {year} | Scenario: {scenario} | Workers: {n_workers} | N: {n_obs} | Optimise: {optimise} | Version: {version} | Regional: {regional_constraint}".format(
                         version=reskilling_version,
@@ -2483,7 +2584,7 @@ class ReskillingPathways:
 
                 # save
                 fname = "results_{}_{}_{}_{}_{}.png".format(
-                    "EU", year, "sectoral", var_fname[i], scenario
+                    "EU", year, "sectoral", fname_snippet, scenario
                 )
                 plt.savefig(
                     os.path.join(
@@ -2501,13 +2602,16 @@ class ReskillingPathways:
 
                 # save numbers
                 if save_tables:
+                    df_transition_numbers[vars] = df_transition_numbers[vars].astype(
+                        float
+                    )
                     res = df_transition_numbers.groupby("NACE1D_label")[vars].describe()
                     res.to_csv(
                         os.path.join(
                             base_dir,
                             dirname,
                             "results_{}_{}_{}_{}_{}.{}".format(
-                                "EU", year, "sectoral", var_fname[i], scenario, "csv"
+                                "EU", year, "sectoral", fname_snippet, scenario, "csv"
                             ),
                         )
                     )
@@ -2613,11 +2717,11 @@ if __name__ == "__main__":
     # reskilling options to consider
     reskilling_modes = [
         None,
-        # "random",
-        # "coreness_weighted",
-        # "computer_literacy",
-        # # "coreness_percentile",
-        # "optimal",
+        "random",
+        "coreness_weighted",
+        "computer_literacy",
+        # "coreness_percentile",
+        "optimal",
     ]
 
     # optimisation target for job transitions
@@ -2625,15 +2729,11 @@ if __name__ == "__main__":
 
     # viability thresholds
     transition_thresholds = [
-        #(1.616368047779022, 6.500853535353546),
-        None,
-        #(3.68, 10.80),
+        (1.616368047779022, 6.500853535353546),
+        None,  # (2.25, 7.25)
+        (3.68, 10.80),
     ]
-    shortcuts = [
-        #"thresh-low",
-        "thresh-perc",
-        #"thresh-emp"
-    ]
+    shortcuts = ["thresh-low", "thresh-perc", "thresh-emp"]
 
     # consideration of regional mobility constraints
     regional_constraints = [False, True]
@@ -2682,9 +2782,9 @@ if __name__ == "__main__":
                     vmax_transitions=8,
                     title_fontsize="small",
                     cbar_fraction=0.025,
+                    combine_vars_in_sector_plot=True,
                 )
-
 
     # Your statements here
     stop = timeit.default_timer()
-    print('Time (min): ', (stop - start) / 60)
+    print("Time (min): ", (stop - start) / 60)
