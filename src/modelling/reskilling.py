@@ -482,9 +482,10 @@ class ReskillingPathways:
                 # stats
                 mean = combined_subset.mean()
                 sd = combined_subset.std()
+                n = int(np.sqrt(len(combined_subset)))
 
                 # append
-                group_res[group] = [mean, sd]
+                group_res[group] = [mean, sd, n]
 
             # append
             sim_container[level] = group_res
@@ -500,6 +501,7 @@ class ReskillingPathways:
                 "level_1": "occupation",
                 0: "sim_mean",
                 1: "sim_sd",
+                2: "n",
             }
         )
 
@@ -2623,7 +2625,7 @@ if __name__ == "__main__":
     from src.data.lfs import EuLfs
 
     # re-run simulations & plot or plot only?
-    rerun_simulations = False
+    rerun_simulations = True
 
     # ---------------------------------------------------------------------
     # Input data
@@ -2727,13 +2729,14 @@ if __name__ == "__main__":
     # optimisation target for job transitions
     optimise = "wage"
 
-    # viability thresholds
+    # skill overlap requirement thresholds (viable, highly viable)
     transition_thresholds = [
-        (1.616368047779022, 6.500853535353546),
-        None,  # (2.25, 7.25)
-        (3.68, 10.80),
+        (1.00, 3.68),
+        # (1.616368047779022, 6.500853535353546),  # "thresh-low"
+        # None,  # (2.25, 7.25)  # "thresh-perc"
+        # (3.68, 10.80),  # "thresh-emp"
     ]
-    shortcuts = ["thresh-low", "thresh-perc", "thresh-emp"]
+    shortcuts = ["thresh-viable-low"]  # ["thresh-low", "thresh-perc", "thresh-emp"]
 
     # consideration of regional mobility constraints
     regional_constraints = [False, True]
