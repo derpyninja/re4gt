@@ -1004,7 +1004,7 @@ class Esco(UsefulPaths):
         return_version="raw",
         assign_labels=False,
         target_path=os.path.join(
-            useful_paths.data_interim, "esco", "occ_skills_matrix.pkl"
+            useful_paths.data_processed, "esco", "occ_skills_matrix.pkl"
         ),
     ):
         """
