@@ -2322,6 +2322,12 @@ class ReskillingPathways:
             # concatenate data across countries
             df_transition_numbers = pd.concat(list(country_results_dict.values()))
 
+            # optionally reset multi-index
+            if isinstance(df_transition_numbers.index, pd.MultiIndex):
+                df_transition_numbers = df_transition_numbers.reset_index()
+
+            print(df_transition_numbers.columns)
+            
             # cast obj to float
             df_transition_numbers = df_transition_numbers.infer_objects()
             df_transition_numbers["AGE"] = pd.to_numeric(df_transition_numbers["AGE"])
@@ -2864,7 +2870,7 @@ if __name__ == "__main__":
     from src.data.lfs import EuLfs
 
     # re-run simulations & plot or plot only?
-    rerun_simulations = True
+    rerun_simulations = False
 
     # ---------------------------------------------------------------------
     # Input data
@@ -3017,20 +3023,20 @@ if __name__ == "__main__":
                 else:
                     simulation_results = None
 
-                # # regional & sectoral distributions of transitions and earnings losses
-                # rp.visualise_simulation_results_eu(
-                #     simulation_results=simulation_results,
-                #     transition_optimisation=optimise,
-                #     reskilling_version=rp.simulation_name[reskilling_mode],
-                #     step=15,
-                #     regional_constraint=regional_constraint,
-                #     base_dir=results_dir,
-                #     vmax_wages=100,
-                #     vmax_transitions=8,
-                #     title_fontsize="small",
-                #     cbar_fraction=0.025,
-                #     combine_vars_in_sector_plot=True,
-                # )
+                # regional & sectoral distributions of transitions and earnings losses
+                rp.visualise_simulation_results_eu(
+                    simulation_results=simulation_results,
+                    transition_optimisation=optimise,
+                    reskilling_version=rp.simulation_name[reskilling_mode],
+                    step=15,
+                    regional_constraint=regional_constraint,
+                    base_dir=results_dir,
+                    vmax_wages=100,
+                    vmax_transitions=8,
+                    title_fontsize="small",
+                    cbar_fraction=0.025,
+                    combine_vars_in_sector_plot=True,
+                )
 
     # Your statements here
     stop = timeit.default_timer()
