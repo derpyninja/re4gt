@@ -2338,6 +2338,17 @@ class ReskillingPathways:
             # calc stats
             n_obs = df_transition_numbers.shape[0]
             n_workers = df_transition_numbers[coeff_weight].sum()  # .astype(int)
+
+            ind_label = "NACE1D_label"
+            if not ind_label in df_transition_numbers.columns.values:
+                df_transition_numbers = pd.merge(
+                    df_transition_numbers,
+                    self.nace_labels,
+                    on="NACE1D",
+                    how="left",
+                    suffixes=("", "_drop"),
+                )
+
             # ---------------------------------------------------------------------
             # REGIONAL AGGREGATION
             # ---------------------------------------------------------------------
@@ -2579,8 +2590,8 @@ class ReskillingPathways:
             fig.tight_layout()
             fig.subplots_adjust(top=1.4)
 
-            fname = "results_{}_{}_{}_{}.{}".format(
-                "EU", year, "regional", scenario, "png"
+            fname = "{}_{}_{}_{}_step_{}.{}".format(
+                "EU", year, "regional", scenario, step, "png"
             )
             plt.savefig(
                 os.path.join(
@@ -2609,7 +2620,7 @@ class ReskillingPathways:
                     os.path.join(
                         base_dir,
                         dirname,
-                        "results_{}_{}_{}_{}.{}".format(
+                        "{}_{}_{}_{}.{}".format(
                             "EU", year, "regional", scenario, "csv"
                         ),
                     )
@@ -2738,8 +2749,8 @@ class ReskillingPathways:
                     sns.despine()
 
                     # save
-                    fname = "results_{}_{}_{}_{}_{}.png".format(
-                        "EU", year, "sectoral", fname_snippet, scenario
+                    fname = "{}_{}_{}_{}_{}_step_{}.png".format(
+                        "EU", year, "sectoral", fname_snippet, scenario, step
                     )
                     plt.savefig(
                         os.path.join(
@@ -2830,8 +2841,8 @@ class ReskillingPathways:
                 sns.despine()
 
                 # save
-                fname = "results_{}_{}_{}_{}_{}.png".format(
-                    "EU", year, "sectoral", fname_snippet, scenario
+                fname = "{}_{}_{}_{}_{}_step_{}.png".format(
+                    "EU", year, "sectoral", fname_snippet, scenario, step
                 )
                 plt.savefig(
                     os.path.join(
@@ -2857,8 +2868,8 @@ class ReskillingPathways:
                         os.path.join(
                             base_dir,
                             dirname,
-                            "results_{}_{}_{}_{}_{}.{}".format(
-                                "EU", year, "sectoral", fname_snippet, scenario, "csv"
+                            "{}_{}_{}_{}_{}_step_{}.{}".format(
+                                "EU", year, "sectoral", fname_snippet, scenario, step, "csv"
                             ),
                         )
                     )
@@ -2870,7 +2881,7 @@ if __name__ == "__main__":
     from src.data.lfs import EuLfs
 
     # re-run simulations & plot or plot only?
-    rerun_simulations = False
+    rerun_simulations = True
 
     # ---------------------------------------------------------------------
     # Input data
@@ -2979,13 +2990,14 @@ if __name__ == "__main__":
         # None,  # (2.25, 7.25)  # "thresh-perc"
         (3.68, 10.80),  # "thresh-emp"
     ]
-    shortcuts = ["thresh-viable-isco4d"]  # ["thresh-low", "thresh-perc", "thresh-emp"]
+    shortcuts = ["thresh-viable-isco4d-v2"]  # ["thresh-low", "thresh-perc", "thresh-emp"]
 
     # consideration of regional mobility constraints
-    regional_constraints = [False, True]
+    regional_constraints = [True, False]
 
     # length of reskilling journey
     reskilling_journey_length = 20
+    steps = np.arange(0, reskilling_journey_length + 1)
 
     # name mapping
     processing_dict = dict(zip(transition_thresholds, shortcuts))
@@ -3023,20 +3035,21 @@ if __name__ == "__main__":
                 else:
                     simulation_results = None
 
-                # regional & sectoral distributions of transitions and earnings losses
-                rp.visualise_simulation_results_eu(
-                    simulation_results=simulation_results,
-                    transition_optimisation=optimise,
-                    reskilling_version=rp.simulation_name[reskilling_mode],
-                    step=15,
-                    regional_constraint=regional_constraint,
-                    base_dir=results_dir,
-                    vmax_wages=100,
-                    vmax_transitions=8,
-                    title_fontsize="small",
-                    cbar_fraction=0.025,
-                    combine_vars_in_sector_plot=True,
-                )
+                # # regional & sectoral distributions of transitions and earnings losses
+                # for step in steps:
+                #     rp.visualise_simulation_results_eu(
+                #         simulation_results=simulation_results,
+                #         transition_optimisation=optimise,
+                #         reskilling_version=rp.simulation_name[reskilling_mode],
+                #         step=step,
+                #         regional_constraint=regional_constraint,
+                #         base_dir=results_dir,
+                #         vmax_wages=100,
+                #         vmax_transitions=8,
+                #         title_fontsize="small",
+                #         cbar_fraction=0.025,
+                #         combine_vars_in_sector_plot=True,
+                #     )
 
     # Your statements here
     stop = timeit.default_timer()
