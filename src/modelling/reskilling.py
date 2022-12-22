@@ -2285,6 +2285,7 @@ class ReskillingPathways:
         cbar_fraction=0.025,
         vmax_transitions=8,
         vmax_wages=100,
+        dynamic_wages_cmap=False,
         title_fontsize="small",
         save_tables=True,
         industry_subset_paper=True,
@@ -2480,33 +2481,49 @@ class ReskillingPathways:
             )
 
             # mask countries with missing earnings data
-            cntr_missing = ["AT", "SE", "NO", "CZ", "IS", "ES"]
+            cntr_missing = ["AT", "CZ", "ES", "GR", "IS", "NO", "SE", "UK"]
             gdf_transition_numbers_by_nuts.loc[
                 gdf_transition_numbers_by_nuts["CNTR_CODE"].isin(cntr_missing),
-                "earnings_delta_closest_switch_sum_mio_step_{}".format(step),
+                "earnings_delta_closest_switch_step_{}".format(step),
             ] = np.nan
 
+            # TODO: emergency normalise the earnings data to per-worker levels
+            # per worker
+            earnings_cols_rel = gdf_transition_numbers_by_nuts.columns[gdf_transition_numbers_by_nuts.columns.str.startswith(
+                "earnings_delta_closest_switch_step")].values
+
+            # Re-mask income data for countries that don’t report data (!)
+            gdf_transition_numbers_by_nuts.loc[gdf_transition_numbers_by_nuts["CNTR_CODE"].isin(
+                cntr_missing), earnings_cols_rel] = np.nan
+
+            # TODO: THIS IS ONLY VALID IF RUNNING THE CODE FOR THE FFPOTC JOB POOL ALONE (!!!!!!!)
+            # NOTE: can back-calculate from region-sector pairs because I also sum up all COEFF's in the reskilling simulations
+            norm_factor = "COEFF_share_brown_slt"
+            for col in earnings_cols_rel:
+                gdf_transition_numbers_by_nuts[col] = gdf_transition_numbers_by_nuts[col] / gdf_transition_numbers_by_nuts[norm_factor]
+
             # cmap
-            vmax_wages = (
-                gdf_transition_numbers_by_nuts[
-                    "earnings_delta_closest_switch_sum_mio_step_{}".format(step)
-                ]
-                .abs()
-                .quantile(q=0.98)
-            )
-            cmap_earnings = plt.get_cmap("coolwarm_r", (vmax_wages / 10) * 2)
+            if dynamic_wages_cmap:
+                vmax_wages = (
+                    gdf_transition_numbers_by_nuts[
+                        "earnings_delta_closest_switch_step_{}".format(step)
+                    ]
+                    .abs()
+                    .quantile(q=0.98)
+                )
+            cmap_earnings = plt.get_cmap("coolwarm_r", (vmax_wages / 1000) * 4)
             cmap_earnings.set_over("darkblue")
             cmap_earnings.set_under("darkred")
 
             # ax2: earnings losses
             gdf_transition_numbers_by_nuts.plot(
-                column="earnings_delta_closest_switch_sum_mio_step_{}".format(step),
+                column="earnings_delta_closest_switch_step_{}".format(step),
                 legend=True,
                 cmap=cmap_earnings,
                 vmin=-vmax_wages,
                 vmax=vmax_wages,
                 legend_kwds={
-                    "label": "$\Delta$ Annual earnings [M€ (2019)]",
+                    "label": "$\Delta$ Annual earnings (€)",
                     "fraction": cbar_fraction,
                     "extend": "both",
                 },
@@ -2536,7 +2553,7 @@ class ReskillingPathways:
             ax2.set_title(
                 "$Total = {:.2f}~M€~(2019)$".format(
                     gdf_transition_numbers_by_nuts[
-                        "earnings_delta_closest_switch_sum_mio_step_{}".format(step)
+                        "earnings_delta_closest_switch_step_{}".format(step)
                     ].sum()
                 )
             )
@@ -2566,7 +2583,7 @@ class ReskillingPathways:
                 # ax4: distribution across regions (earnings)
                 sns.boxplot(
                     x=gdf_transition_numbers_by_nuts[
-                        "earnings_delta_closest_switch_sum_mio_step_{}".format(step)
+                        "earnings_delta_closest_switch_step_{}".format(step)
                     ],
                     ax=ax4,
                 )
@@ -2611,7 +2628,7 @@ class ReskillingPathways:
             # save numbers
             # todo: adjust to jointly save the numbers from all reskilling steps
             vars = [
-                "earnings_delta_closest_switch_sum_mio_step_{}".format(step),
+                "earnings_delta_closest_switch_step_{}".format(step),
                 "n_viable_transitions_step_{}".format(step),
             ]
             if save_tables:
@@ -2629,7 +2646,7 @@ class ReskillingPathways:
             # INDUSTRY PLOTS (earnings losses and transition numbers)
             # ---------------------------------------------------------------------
             vars = [
-                "earnings_delta_closest_switch_sum_mio_step_{}".format(step),
+                "earnings_delta_closest_switch_step_{}".format(step),
                 "n_viable_transitions_step_{}".format(step),
             ]
             var_labels = [
@@ -2881,7 +2898,7 @@ if __name__ == "__main__":
     from src.data.lfs import EuLfs
 
     # re-run simulations & plot or plot only?
-    rerun_simulations = True
+    rerun_simulations = False
 
     # ---------------------------------------------------------------------
     # Input data
@@ -3035,21 +3052,22 @@ if __name__ == "__main__":
                 else:
                     simulation_results = None
 
-                # # regional & sectoral distributions of transitions and earnings losses
-                # for step in steps:
-                #     rp.visualise_simulation_results_eu(
-                #         simulation_results=simulation_results,
-                #         transition_optimisation=optimise,
-                #         reskilling_version=rp.simulation_name[reskilling_mode],
-                #         step=step,
-                #         regional_constraint=regional_constraint,
-                #         base_dir=results_dir,
-                #         vmax_wages=100,
-                #         vmax_transitions=8,
-                #         title_fontsize="small",
-                #         cbar_fraction=0.025,
-                #         combine_vars_in_sector_plot=True,
-                #     )
+                # regional & sectoral distributions of transitions and earnings losses
+                for step in steps:
+                    rp.visualise_simulation_results_eu(
+                        simulation_results=simulation_results,
+                        transition_optimisation=optimise,
+                        reskilling_version=rp.simulation_name[reskilling_mode],
+                        step=step,
+                        regional_constraint=regional_constraint,
+                        base_dir=results_dir,
+                        vmax_wages=3000,
+                        vmax_transitions=8,
+                        show_title=False,
+                        title_fontsize="small",
+                        cbar_fraction=0.025,
+                        combine_vars_in_sector_plot=True,
+                    )
 
     # Your statements here
     stop = timeit.default_timer()
