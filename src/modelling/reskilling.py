@@ -3045,6 +3045,7 @@ if __name__ == "__main__":
                         reskilling=reskilling_mode,
                         reskilling_journey_length=reskilling_journey_length,
                         region_constraints=regional_constraint,
+                        target_job_availability_coeff="COEFF_mean+sd",
                         mask_diagonal=True,
                         transition_thresholds=transition_threshold,
                         out_dir=results_dir,
