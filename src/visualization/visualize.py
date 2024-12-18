@@ -361,6 +361,7 @@ class EulfsVis(EulfsDs):
         vmin,
         vmax=None,
         cmap="Greys",
+        cmap_set_over=None,
         n_cats=None,
         max_folder_name_length=50,
         additional_title_info=None,
@@ -389,6 +390,10 @@ class EulfsVis(EulfsDs):
                 cmap = plt.get_cmap(cmap, n_cats)
             else:
                 cmap = plt.get_cmap(cmap)
+
+            # extend max, color for above triangle
+            if cmap_set_over is not None:
+                cmap.set_over(cmap_set_over)
 
             # plot data
             gdf_sub.plot(

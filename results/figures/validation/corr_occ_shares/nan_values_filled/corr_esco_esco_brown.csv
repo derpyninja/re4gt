@@ -1,4 +1,0 @@
-,X,Y,method,alternative,n,r,CI95%,p-unc,BF10,power
-0,share_brown_esco,share_brown_esco_ess,pearson,two-sided,3007,0.875473200262037,[0.87 0.88],0.0,inf,1.0
-1,share_brown_esco,share_brown_vona2018,pearson,two-sided,3008,0.4757054108322946,[0.45 0.5 ],1.0312699189938162e-169,5.24e+165,1.0
-2,share_brown_esco_ess,share_brown_vona2018,pearson,two-sided,3007,0.44108733286376256,[0.41 0.47],2.1593686737243396e-143,2.81e+139,1.0

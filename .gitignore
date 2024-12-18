@@ -145,3 +145,19 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# -------------------------------------------------------------------------------------
+# Joule Submission 12-2024
+# -------------------------------------------------------------------------------------
+
+# exclude imgs for submission
+*.jpg
+*.png
+
+# exclude pkls as many are too large
+*.pkl
+*.pickle
+
+# exclude r code for submission
+/rcode/
+/results/
