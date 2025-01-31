@@ -1,9 +1,14 @@
 
 
-Reskilling for the green transition
+Skills-based and regionally explicit labor market exposure to the low-carbon transition in Europe
 ==============================
 
-This project investigates the impact of the policy-driven transition to a climate neutral European economy on labour markets with a specific focus on the role of re- and upskilling.
+Decarbonizing the European economy has far-reaching implications for the continent’s labor markets, as many high-carbon jobs may be at risk of displacement. This threatens the economic potential of communities and can lead to political backlash to climate policy. On these grounds, the European Commission proposed a “Just Transition Mechanism” to cushion adverse labor market effects. Our article helps target and tailor its policies by providing a regionally and sectorally explicit analysis of high- and low-carbon job shares and a skill profile analysis to gauge the feasibility of at-risk workers transitioning into other jobs.
+
+- Technological decarbonization reduce at-risk workers by ∼60% to 1.1% of total workforce
+- Most at-risk jobs are in mining (in %) and manufacturing (abs. numbers)
+- At-risk jobs face skill gaps, limiting workers' ability to transition to other jobs
+- Germany and Hungary show high risks with low EU Just Transition Fund support
 
 Project Organization
 ------------
