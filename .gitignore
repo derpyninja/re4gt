@@ -160,4 +160,31 @@ rsconnect/
 
 # exclude r code for submission
 /rcode/
+
+# exclude results
 /results/
+
+# exclude files related to reskilling
+/models/
+/src/modelling/
+
+# exclude old notebooks
+/notebooks/01-fz-esco-preprocessing.ipynb
+/notebooks/01-fz-lfs-data-exploration-cz.ipynb
+/notebooks/01-fz-lfs-data-exploration-de.ipynb
+/notebooks/01-fz-lfs-data-preprocessing.ipynb
+/notebooks/02-fz-lfs-data-germany-all-years.ipynb
+/notebooks/03-fz-lfs-transition-analysis-cooccurrence.ipynb
+/notebooks/03-fz-lfs-transition-analysis-matrix-tables.ipynb
+/notebooks/05-fz-lfs-coreness-maps.ipynb
+
+# exclude notebooks related to reskilling (or sensitive)
+/notebooks/new/04-fz-lfs-upskilling-analysis.ipynb
+/notebooks/new/12-fz-reskilling-intensity-analysis.ipynb
+/notebooks/new/13-fz-qualtrics-survey-analysis.ipynb
+/notebooks/new/14-fz-lfs-transition-analysis-cooccurrence.ipynb
+/notebooks/new/15-fz-analysis-microcensus-results.ipynb
+/notebooks/new/16-fz-lfs-derive-employment-fluctuations.ipynb
+/notebooks/new/17-fz-visualise-reskilling-simulations.ipynb
+/notebooks/new/18-fz-skills-rca-calculation.ipynb
+/notebooks/new/20-lp-aux-openai_api.ipynb
